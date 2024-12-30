@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:paylink_pos/screens/home_page.dart';
+import 'package:paylink_pos/screens/home_screen.dart';
+import 'package:paylink_pos/screens/login_screen.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'screens/product_list_screen.dart';
 import 'screens/add_product_screen.dart';
@@ -23,54 +26,23 @@ class POSApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      restorationScopeId: "Test", // <-- Add this line
       title: 'POS System',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      initialRoute: '/',
+      initialRoute: '/login',
       routes: {
-        '/': (context) => const HomePage(),
+        '/home': (context) => const HomePage(),
+        '/login': (context) => LoginScreen(),
         '/products': (context) => const ProductListScreen(),
         '/add-product': (context) => const AddProductScreen(),
         '/selling': (context) => const SellingScreen(),
         '/bill': (context) => const BillScreen(),
+        '/dashboard': (context) => const HomeScreen(),
       },
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('POS System'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/products'),
-              child: const Text('Products Management'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/selling'),
-              child: const Text('Selling Screen'),
-            ),
-            const SizedBox(height: 20),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/add-product'),
-              child: const Text('Add Product Screen'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

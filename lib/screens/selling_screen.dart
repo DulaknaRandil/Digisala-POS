@@ -1,6 +1,6 @@
 // lib/screens/selling_screen.dart
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/database/db_helper.dart';
+import 'package:paylink_pos/database/product_db_helper.dart';
 import 'package:paylink_pos/models/bill_model.dart';
 
 class SellingScreen extends StatefulWidget {
@@ -91,7 +91,8 @@ class _SellingScreenState extends State<SellingScreen> {
               children: [
                 Text(
                   'Total: \$${totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(

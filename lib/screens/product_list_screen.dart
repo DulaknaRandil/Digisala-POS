@@ -1,6 +1,5 @@
-// lib/screens/product_list_screen.dart
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/database/db_helper.dart';
+import 'package:paylink_pos/database/product_db_helper.dart';
 import 'package:paylink_pos/models/product_model.dart';
 
 class ProductListScreen extends StatelessWidget {
@@ -30,7 +29,7 @@ class ProductListScreen extends StatelessWidget {
                 final product = snapshot.data![index];
                 return ListTile(
                   title: Text(product.name),
-                  subtitle: Text('Quantity: ${product.quantity}'),
+                  subtitle: Text('Quantity: \\${product.quantity}'),
                   trailing: Text('\$${product.price.toStringAsFixed(2)}'),
                 );
               },
