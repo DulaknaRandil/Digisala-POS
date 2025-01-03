@@ -162,52 +162,9 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                 ],
               ),
               pw.SizedBox(height: 20),
-              pw.Text('Items', style: pw.TextStyle(fontSize: 20)),
-              pw.SizedBox(height: 10),
-              // Items Table
-              pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  // Header
-                  pw.TableRow(
-                    children: [
-                      'ID',
-                      'Name',
-                      'Quantity',
-                      'Price',
-                      'Discount',
-                      'Total',
-                      'Refund Status',
-                    ]
-                        .map((text) => pw.Container(
-                              padding: const pw.EdgeInsets.all(8),
-                              child: pw.Text(text),
-                            ))
-                        .toList(),
-                  ),
-                  // Data rows
-                  ..._salesItems.map((item) => pw.TableRow(
-                        children: [
-                          item.id.toString(),
-                          item.name,
-                          item.quantity.toString(),
-                          item.price.toString(),
-                          item.discount.toString(),
-                          item.total.toString(),
-                          _refundedQuantities[item.id] != null
-                              ? 'Refunded'
-                              : '-',
-                        ]
-                            .map((text) => pw.Container(
-                                  padding: const pw.EdgeInsets.all(8),
-                                  child: pw.Text(text),
-                                ))
-                            .toList(),
-                      )),
-                ],
-              ),
-              pw.SizedBox(height: 20),
+
               pw.Text('Summary', style: pw.TextStyle(fontSize: 18)),
+              pw.SizedBox(height: 2),
               pw.Text('Sales Count: $_salesCount'),
               pw.Text('Total Amount: $_totalAmount LKR'),
             ],
@@ -233,290 +190,342 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-      child: Container(
-        width: 800,
-        height: 600,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // At the top of your SalesHistoryDialog class
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Sales History',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.picture_as_pdf),
-                      label: const Text('PDF'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                      ),
-                      onPressed: _generatePdf,
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.print),
-                      label: const Text('Print'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                      ),
-                      onPressed: _printDocument,
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const Divider(color: Colors.white),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    style: const TextStyle(color: Colors.white),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search by Sales ID',
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white),
-                        onPressed: _searchSales,
-                      ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.calendar_today,
-                    color: Colors.white,
-                  ),
-                  onPressed: _selectDateRange,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: Column(
+    return SingleChildScrollView(
+      child: Dialog(
+        backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+        child: Container(
+          width: 900,
+          height: 750,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // At the top of your SalesHistoryDialog class
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSalesTable(),
-                  const Divider(color: Colors.white),
-                  _buildItemsTable(),
+                  const Text(
+                    'Sales History',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text('PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _generatePdf,
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.print),
+                        label: const Text('Print'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _printDocument,
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ),
-            const Divider(color: Colors.white),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Sales count: $_salesCount',
-                  style: const TextStyle(color: Colors.white),
+
+              const Divider(color: Colors.white),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      style: const TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search by Sales ID',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.search, color: Colors.white),
+                          onPressed: _searchSales,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.calendar_today,
+                      color: Colors.white,
+                    ),
+                    onPressed: _selectDateRange,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Column(
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 40,
+                        ),
+                        Text('Sales',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18)),
+                      ],
+                    ),
+                    SizedBox(
+                      height: 10,
+                    ),
+                    _buildSalesTable(),
+                    const Divider(color: Colors.white),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 40,
+                        ),
+                        Text('Sales Items',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18)),
+                      ],
+                    ),
+                    SizedBox(
+                      height: 10,
+                    ),
+                    _buildItemsTable(),
+                  ],
                 ),
-                Text(
-                  'Total amount: $_totalAmount LKR',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          ],
+              ),
+              const Divider(color: Colors.white),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Sales count: $_salesCount',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  Text(
+                    'Total amount: $_totalAmount LKR',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildSalesTable() {
-    return Expanded(
+    return SizedBox(
+      height: 250, // Adjust height to show three rows
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: MaterialStateProperty.all(
-              const Color.fromARGB(56, 131, 131, 128)),
-          dataRowColor: MaterialStateProperty.resolveWith<Color>(
-            (Set<MaterialState> states) {
-              if (states.contains(MaterialState.selected)) {
-                return Theme.of(context).colorScheme.primary.withOpacity(0.08);
-              }
-              return Colors.white.withAlpha(8);
-            },
-          ),
-          columns: const [
-            DataColumn(
-                label: Text('ID', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Date', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Time', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Method', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Payment', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Discount', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Total', style: TextStyle(color: Colors.white))),
-          ],
-          rows: _salesList.map((sales) {
-            return DataRow(
-              color: MaterialStateProperty.resolveWith<Color>(
-                (Set<MaterialState> states) {
-                  if (states.contains(MaterialState.selected)) {
-                    return Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withOpacity(0.08);
-                  }
-                  return Colors.white.withAlpha(8);
-                },
-              ),
-              cells: [
-                DataCell(Text('${sales.id}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text(
-                    '${sales.date.day}/${sales.date.month}/${sales.date.year}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${sales.time}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${sales.paymentMethod}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${sales.subtotal}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${sales.discount}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${sales.total}',
-                    style: const TextStyle(color: Colors.white))),
-              ],
-              onSelectChanged: (selected) {
-                if (selected == true) {
-                  _loadSalesItems(sales.id!);
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: DataTable(
+            headingRowColor: MaterialStateProperty.all(
+                const Color.fromARGB(56, 131, 131, 128)),
+            dataRowColor: MaterialStateProperty.resolveWith<Color>(
+              (Set<MaterialState> states) {
+                if (states.contains(MaterialState.selected)) {
+                  return Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withOpacity(0.08);
                 }
+                return Colors.white.withAlpha(8);
               },
-            );
-          }).toList(),
+            ),
+            columns: const [
+              DataColumn(
+                  label: Text('ID', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Date', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Time', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Method', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label:
+                      Text('Payment', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label:
+                      Text('Discount', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Total', style: TextStyle(color: Colors.white))),
+            ],
+            rows: _salesList.map((sales) {
+              return DataRow(
+                color: MaterialStateProperty.resolveWith<Color>(
+                  (Set<MaterialState> states) {
+                    if (states.contains(MaterialState.selected)) {
+                      return Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withOpacity(0.08);
+                    }
+                    return Colors.white.withAlpha(8);
+                  },
+                ),
+                cells: [
+                  DataCell(Text('${sales.id}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text(
+                      '${sales.date.day}/${sales.date.month}/${sales.date.year}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${sales.time}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${sales.paymentMethod}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${sales.subtotal}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${sales.discount}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${sales.total}',
+                      style: const TextStyle(color: Colors.white))),
+                ],
+                onSelectChanged: (selected) {
+                  if (selected == true) {
+                    _loadSalesItems(sales.id!);
+                  }
+                },
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildItemsTable() {
-    return Expanded(
+    return SizedBox(
+      height: 180, // Adjust height to show three rows
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: MaterialStateProperty.all(
-              const Color.fromARGB(56, 131, 131, 128)),
-          dataRowColor: MaterialStateProperty.resolveWith<Color>(
-            (Set<MaterialState> states) {
-              if (states.contains(MaterialState.selected)) {
-                return Theme.of(context).colorScheme.primary.withOpacity(0.08);
-              }
-              return Colors.white.withAlpha(8);
-            },
-          ),
-          columns: const [
-            DataColumn(
-                label: Text('ID', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Name', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Quantity', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Price', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Discount', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Total', style: TextStyle(color: Colors.white))),
-            DataColumn(
-                label: Text('Refund', style: TextStyle(color: Colors.white))),
-          ],
-          rows: _salesItems.map((item) {
-            final refundedQuantity = _refundedQuantities[item.id] ?? 0;
-            return DataRow(
-              color: MaterialStateProperty.resolveWith<Color>(
-                (Set<MaterialState> states) {
-                  if (states.contains(MaterialState.selected)) {
-                    return Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withOpacity(0.08);
-                  }
-                  return Colors.white.withAlpha(8);
-                },
-              ),
-              cells: [
-                DataCell(Text('${item.id}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${item.name}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${item.quantity}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${item.price}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${item.discount}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(Text('${item.total}',
-                    style: const TextStyle(color: Colors.white))),
-                DataCell(
-                  refundedQuantity > 0
-                      ? Text('Refunded: $refundedQuantity',
-                          style: const TextStyle(color: Colors.green))
-                      : Row(
-                          children: [
-                            SizedBox(
-                              width: 50,
-                              child: TextField(
-                                style: const TextStyle(color: Colors.white),
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  hintText: 'Qty',
-                                  hintStyle: TextStyle(color: Colors.white54),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: DataTable(
+            headingRowColor: MaterialStateProperty.all(
+                const Color.fromARGB(56, 131, 131, 128)),
+            dataRowColor: MaterialStateProperty.resolveWith<Color>(
+              (Set<MaterialState> states) {
+                if (states.contains(MaterialState.selected)) {
+                  return Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withOpacity(0.08);
+                }
+                return Colors.white.withAlpha(8);
+              },
+            ),
+            columns: const [
+              DataColumn(
+                  label: Text('ID', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Name', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label:
+                      Text('Quantity', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Price', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label:
+                      Text('Discount', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Total', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                  label: Text('Refund', style: TextStyle(color: Colors.white))),
+            ],
+            rows: _salesItems.map((item) {
+              final refundedQuantity = _refundedQuantities[item.id] ?? 0;
+              return DataRow(
+                color: MaterialStateProperty.resolveWith<Color>(
+                  (Set<MaterialState> states) {
+                    if (states.contains(MaterialState.selected)) {
+                      return Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withOpacity(0.08);
+                    }
+                    return Colors.white.withAlpha(8);
+                  },
+                ),
+                cells: [
+                  DataCell(Text('${item.id}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${item.name}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${item.quantity}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${item.price}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${item.discount}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${item.total}',
+                      style: const TextStyle(color: Colors.white))),
+                  DataCell(
+                    refundedQuantity > 0
+                        ? Text('Refunded: $refundedQuantity',
+                            style: const TextStyle(color: Colors.green))
+                        : Row(
+                            children: [
+                              SizedBox(
+                                width: 50,
+                                child: TextField(
+                                  style: const TextStyle(color: Colors.white),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Qty',
+                                    hintStyle: TextStyle(color: Colors.white54),
+                                  ),
+                                  onSubmitted: (value) {
+                                    final refundQuantity =
+                                        int.tryParse(value) ?? 0;
+                                    _handleRefund(item, refundQuantity);
+                                  },
                                 ),
-                                onSubmitted: (value) {
+                              ),
+                              TextButton(
+                                onPressed: () {
                                   final refundQuantity =
-                                      int.tryParse(value) ?? 0;
+                                      item.quantity; // Default to full quantity
                                   _handleRefund(item, refundQuantity);
                                 },
+                                child: const Text('Refund',
+                                    style: TextStyle(color: Colors.blue)),
                               ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                final refundQuantity =
-                                    item.quantity; // Default to full quantity
-                                _handleRefund(item, refundQuantity);
-                              },
-                              child: const Text('Refund',
-                                  style: TextStyle(color: Colors.blue)),
-                            ),
-                          ],
-                        ),
-                ),
-              ],
-            );
-          }).toList(),
+                            ],
+                          ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
         ),
       ),
     );

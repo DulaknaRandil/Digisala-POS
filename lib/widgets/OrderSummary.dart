@@ -12,6 +12,7 @@ class OrderSummary extends StatefulWidget {
   final Function() onDiscount;
   final DiscountManager
       discountManager; // Use DiscountManager instead of discount
+  final int salesId;
 
   const OrderSummary({
     Key? key,
@@ -22,6 +23,7 @@ class OrderSummary extends StatefulWidget {
     required this.onCardPayment,
     required this.onDiscount,
     required this.discountManager,
+    required this.salesId,
   }) : super(key: key);
 
   @override
@@ -234,8 +236,8 @@ class _OrderSummaryState extends State<OrderSummary> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Order : T7',
+                  Text(
+                    'Order : ${widget.salesId}',
                     style: TextStyle(
                       color: Color(0xFFD1D5DB),
                       fontSize: 22,

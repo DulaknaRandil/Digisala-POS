@@ -131,6 +131,12 @@ class DatabaseHelper {
     }
   }
 
+  Future<int> getLatestSalesId() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT MAX(id) as maxId FROM sales');
+    return (result.first['maxId'] as int?) ?? 0;
+  }
+
   Future<int> updateProduct(Product product) async {
     try {
       final db = await instance.database;

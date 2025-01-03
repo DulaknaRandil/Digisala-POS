@@ -23,7 +23,7 @@ class LoginScreen extends StatelessWidget {
             Expanded(
               child: PinEntryComponent(
                 onPinComplete: (pin) {
-                  Navigator.pushReplacementNamed(context, '/home');
+                  Navigator.pushReplacementNamed(context, '/dashboard');
                 },
                 showLogo: false,
               ),

@@ -6,12 +6,16 @@ import 'package:paylink_pos/widgets/stock_dialog.dart';
 class Footer extends StatefulWidget {
   final String userRole;
   final String? avatarUrl;
+  final VoidCallback onVoidOrder;
+  final VoidCallback onPayment;
 
   const Footer({
     Key? key,
     this.userRole = 'Admin',
     this.avatarUrl =
         'https://dashboard.codeparrot.ai/api/assets/Z3Ars5_bRV0pnkce',
+    required this.onVoidOrder,
+    required this.onPayment,
   }) : super(key: key);
 
   @override
@@ -83,7 +87,7 @@ class _FooterState extends State<Footer> {
               icon: const Icon(Icons.logout, color: Colors.black),
               onPressed: () {
                 // Handle logout action
-                Navigator.pushNamed(context, '/home');
+                Navigator.pushNamed(context, '/login');
               },
             ),
           ),
@@ -118,18 +122,14 @@ class _FooterState extends State<Footer> {
             ],
           ),
           const Spacer(),
-          _buildActionButton('Void Order', Colors.red, () {
-            // Handle Void Order action
-          }),
+          _buildActionButton('Void Order', Colors.red, widget.onVoidOrder),
           _buildActionButton('End of Day', Colors.lightBlue, () {
             // Handle End of Day action
           }),
           _buildActionButton('Stock', Colors.pinkAccent, () {
             _showStockDialog();
           }),
-          _buildActionButton('Payment', Colors.green, () {
-            // Handle Payment action
-          }),
+          _buildActionButton('Payment', Colors.green, widget.onPayment),
         ],
       ),
     );

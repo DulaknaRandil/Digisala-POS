@@ -29,10 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Product> _products = [];
   List<Product> _checkoutList = [];
   final DiscountManager _discountManager = DiscountManager();
-
+  int _currentSalesId = 1;
   @override
   void initState() {
     super.initState();
+    _initializeSalesId();
     _loadProducts();
   }
 
@@ -43,10 +44,27 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _initializeSalesId() async {
+    final latestSalesId = await DatabaseHelper.instance.getLatestSalesId();
+    setState(() {
+      _currentSalesId = latestSalesId + 1;
+    });
+  }
+
   void _addProductToCheckout(Product product) {
     setState(() {
-      product.quantity = 1; // Set initial quantity to 1
-      _checkoutList.add(product);
+      // Attempt to find the existing product in the checkout list
+      final existingProductIndex =
+          _checkoutList.indexWhere((p) => p.id == product.id);
+
+      if (existingProductIndex != -1) {
+        // If the product exists, increase its quantity by 1
+        _checkoutList[existingProductIndex].quantity += 1;
+      } else {
+        // If the product does not exist, add it with an initial quantity of 1
+        product.quantity = 1;
+        _checkoutList.add(product);
+      }
     });
     print('Product added: ${product.name}');
   }
@@ -72,6 +90,14 @@ class _HomeScreenState extends State<HomeScreen> {
       0.0,
       (sum, product) => sum + (product.price * product.quantity),
     );
+  }
+
+  void _handleVoidOrder() {
+    setState(() {
+      _checkoutList.clear();
+      _discountManager.reset();
+    });
+    print('Order has been voided.');
   }
 
   double _calculateTotal() {
@@ -154,6 +180,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     _printReceipt(sales, salesId);
+
+    // Clear the order summary and product list
+    setState(() {
+      _checkoutList.clear();
+      _discountManager.reset();
+      _currentSalesId++;
+    });
   }
 
   void _printReceipt(Sales sales, int salesId) {
@@ -342,13 +375,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     onCardPayment: _handleCardPayment,
                     discountManager:
                         _discountManager, // Pass the DiscountManager
+                    salesId: _currentSalesId,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             const Divider(color: Color(0xFF2D2D2D), thickness: 1),
-            const Footer(),
+            Footer(
+              onVoidOrder: _handleVoidOrder, // Pass the callback here
+              onPayment: _handlePayment,
+            ),
           ],
         ),
       ),
