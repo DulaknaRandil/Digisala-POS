@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:paylink_pos/widgets/stock_dialog.dart';
+
 class Footer extends StatefulWidget {
   final String userRole;
   final String? avatarUrl;
@@ -47,6 +49,15 @@ class _FooterState extends State<Footer> {
     return '$hour:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')} $period';
   }
 
+  void _showStockDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const StockDialog();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -62,6 +73,21 @@ class _FooterState extends State<Footer> {
       ),
       child: Row(
         children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.logout, color: Colors.black),
+              onPressed: () {
+                // Handle logout action
+                Navigator.pushNamed(context, '/home');
+              },
+            ),
+          ),
+          const SizedBox(width: 16),
           CircleAvatar(
             radius: 32,
             backgroundImage: NetworkImage(widget.avatarUrl ?? ''),
@@ -99,25 +125,11 @@ class _FooterState extends State<Footer> {
             // Handle End of Day action
           }),
           _buildActionButton('Stock', Colors.pinkAccent, () {
-            // Handle Stock action
+            _showStockDialog();
           }),
           _buildActionButton('Payment', Colors.green, () {
             // Handle Payment action
           }),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.logout, color: Colors.black),
-              onPressed: () {
-                // Handle logout action
-                Navigator.pushNamed(context, '/home');
-              },
-            ),
-          ),
         ],
       ),
     );
@@ -130,7 +142,7 @@ class _FooterState extends State<Footer> {
         onTap: onPressed,
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(8),
@@ -139,7 +151,7 @@ class _FooterState extends State<Footer> {
             text,
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 16,
+              fontSize: 24,
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),

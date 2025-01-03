@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:paylink_pos/models/product_model.dart';
+import 'package:paylink_pos/models/salesItem_model.dart';
+import 'package:paylink_pos/models/sales_model.dart';
 import 'package:paylink_pos/widgets/OrderSummary.dart';
 import 'package:paylink_pos/widgets/ProductList.dart';
 import 'package:paylink_pos/widgets/action_buttons.dart';
 import 'package:paylink_pos/widgets/add_group.dart';
+import 'package:paylink_pos/widgets/discount%20widgets/discount_manager.dart';
 import 'package:paylink_pos/widgets/discount_calculator.dart';
 import 'package:paylink_pos/widgets/footer.dart';
 import 'package:paylink_pos/widgets/logo_component.dart';
 import 'package:paylink_pos/widgets/new_product_form.dart';
+import 'package:paylink_pos/widgets/payment%20widgets/payment_dialog.dart';
 import 'package:paylink_pos/widgets/product_update.dart';
+import 'package:paylink_pos/widgets/return_list.dart';
+import 'package:paylink_pos/widgets/sales_history_dialog.dart' as salesHistory;
 import 'package:paylink_pos/widgets/search_bar.dart' as custom;
 import 'package:paylink_pos/database/product_db_helper.dart';
 
@@ -22,8 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Product> _products = [];
   List<Product> _checkoutList = [];
-  double _discount = 0.0;
-  bool _isPercentageDiscount = true;
+  final DiscountManager _discountManager = DiscountManager();
 
   @override
   void initState() {
@@ -69,8 +74,106 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  double _calculateTotal() {
+    final subtotal = _calculateSubtotal();
+    final discount = _discountManager.calculateDiscount(
+      {
+        for (var product in _checkoutList)
+          product.id.toString(): product.price * product.quantity
+      },
+    );
+    return subtotal - discount;
+  }
+
   void _handlePayment() {
-    print('Processing payment...');
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return PaymentDialog(
+          total: _calculateTotal(),
+          onPaidAmountChanged: (paidAmount) {
+            print(_discountManager.calculateDiscount(
+              {
+                for (var product in _checkoutList)
+                  product.id.toString(): product.price * product.quantity
+              },
+            ));
+          },
+          onClose: () {
+            Navigator.of(context).pop();
+          },
+          onPrintReceipt: () {
+            _createSalesRecord('Cash');
+            print('Print Receipt');
+          },
+          onPDF: () {
+            _createSalesRecord('Card');
+            print('Generate PDF');
+          },
+        );
+      },
+    );
+  }
+
+  void _createSalesRecord(String paymentMethod) async {
+    final sales = Sales(
+      date: DateTime.now(),
+      time: TimeOfDay.now().format(context),
+      paymentMethod: paymentMethod,
+      subtotal: _calculateSubtotal(),
+      discount: _discountManager.calculateDiscount(
+        {
+          for (var product in _checkoutList)
+            product.id.toString(): product.price * product.quantity
+        },
+      ),
+      total: _calculateTotal(),
+    );
+
+    final salesId = await DatabaseHelper.instance.insertSales(sales);
+
+    for (var product in _checkoutList) {
+      final salesItem = SalesItem(
+        salesId: salesId,
+        name: product.name,
+        quantity: product.quantity,
+        price: product.price,
+        discount: _discountManager.calculateItemDiscount(
+          product.id.toString(),
+          product.price * product.quantity,
+          _calculateSubtotal(),
+        ),
+        total: product.price * product.quantity,
+      );
+
+      await DatabaseHelper.instance.insertSalesItem(salesItem);
+
+      final originalProduct = _products.firstWhere((p) => p.id == product.id);
+      originalProduct.quantity -= product.quantity;
+      await DatabaseHelper.instance.updateProduct(originalProduct);
+    }
+
+    _printReceipt(sales, salesId);
+  }
+
+  void _printReceipt(Sales sales, int salesId) {
+    print('Printing Receipt...');
+    print('Store Name: Your Store');
+    print('Address: 123 Main St');
+    print('Date: ${sales.date}');
+    print('Time: ${sales.time}');
+    print('Sales No: $salesId');
+    print('--------------------------------');
+    for (var product in _checkoutList) {
+      print(
+          '${product.name} x${product.quantity} - ${product.price * product.quantity} LKR');
+    }
+    print('--------------------------------');
+    print('Subtotal: ${sales.subtotal} LKR');
+    print('Discount: ${sales.discount} LKR');
+    print('Total: ${sales.total} LKR');
+    print('Payment Method: ${sales.paymentMethod}');
+    print('Thank you, come again!');
   }
 
   void _handleCashPayment() {
@@ -81,11 +184,22 @@ class _HomeScreenState extends State<HomeScreen> {
     print('Processing card payment...');
   }
 
-  double _calculateActualDiscount() {
-    if (_isPercentageDiscount) {
-      return (_discount / 100) * _calculateSubtotal();
-    }
-    return _discount;
+  void _showSalesHistory() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const salesHistory.SalesHistoryDialog();
+      },
+    );
+  }
+
+  void _showReturnList() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const ReturnListDialog();
+      },
+    );
   }
 
   void _showDiscountCalculator() {
@@ -93,15 +207,14 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (BuildContext context) {
         return DiscountCalculator(
-          defaultIsPercentage: _isPercentageDiscount,
-          initialValue: _isPercentageDiscount
-              ? _discount.toStringAsFixed(2)
-              : _discount.toStringAsFixed(2),
+          defaultIsPercentage: _discountManager.orderDiscountIsPercentage,
+          initialValue: _discountManager.orderDiscountValue.toStringAsFixed(2),
           onDiscountSelected: (value, isPercent) {
             setState(() {
-              _discount = value;
-              _isPercentageDiscount = isPercent;
+              _discountManager.setOrderDiscount(value, isPercent);
             });
+            print('New Discount: $value');
+            print('Is Percentage: $isPercent');
             Navigator.of(context).pop();
           },
           onClose: () {
@@ -133,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return GroupForm(); // Show the GroupForm dialog
+        return GroupForm();
       },
     );
   }
@@ -142,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return ProductUpdateForm(); // Show the ProductUpdateForm dialog
+        return ProductUpdateForm();
       },
     );
   }
@@ -150,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleClose() {
     setState(() {
       _checkoutList.clear();
-      _discount = 0.0;
+      _discountManager.reset();
     });
   }
 
@@ -213,10 +326,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ActionButtons(
                         onNewPressed: _showNewProductForm,
                         onGroupPressed: _showGroupForm,
-                        onUpdatePressed:
-                            _showProductUpdateForm, // Update button action
-                        onHistoryPressed: () {},
-                        onSecurityPressed: () {},
+                        onUpdatePressed: _showProductUpdateForm,
+                        onHistoryPressed: _showSalesHistory,
+                        onSecurityPressed: _showReturnList,
                       ),
                     ],
                   ),
@@ -228,7 +340,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPayment: _handlePayment,
                     onCashPayment: _handleCashPayment,
                     onCardPayment: _handleCardPayment,
-                    discount: _calculateActualDiscount(),
+                    discountManager:
+                        _discountManager, // Pass the DiscountManager
                   ),
                 ],
               ),

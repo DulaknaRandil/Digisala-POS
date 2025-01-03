@@ -1,5 +1,8 @@
 import 'package:paylink_pos/models/group_model.dart';
 import 'package:paylink_pos/models/product_model.dart';
+import 'package:paylink_pos/models/salesItem_model.dart';
+import 'package:paylink_pos/models/sales_model.dart';
+import 'package:paylink_pos/models/return_model.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -32,7 +35,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         barcode TEXT NOT NULL,
         name TEXT NOT NULL,
-       expiryDate TEXT,
+        expiryDate TEXT,
         productGroup TEXT NOT NULL,
         quantity INTEGER NOT NULL,
         price REAL NOT NULL,
@@ -41,10 +44,50 @@ class DatabaseHelper {
         status TEXT NOT NULL
       )
     ''');
+
     await db.execute('''
       CREATE TABLE groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE sales(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL,
+        subtotal REAL NOT NULL,
+        discount REAL NOT NULL,
+        total REAL NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE sales_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        salesId INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        price REAL NOT NULL,
+        discount REAL NOT NULL,
+        total REAL NOT NULL,
+        refund INTEGER NOT NULL,
+        FOREIGN KEY (salesId) REFERENCES sales (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE returns(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        salesItemId INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        discount REAL NOT NULL,
+        total REAL NOT NULL,
+        returnDate TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        FOREIGN KEY (salesItemId) REFERENCES sales_items (id)
       )
     ''');
   }
@@ -124,6 +167,16 @@ class DatabaseHelper {
     );
   }
 
+  Future<int> getLastSalesId() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> result =
+        await db.rawQuery('SELECT MAX(id) as lastId FROM sales');
+    if (result.isNotEmpty && result.first['lastId'] != null) {
+      return result.first['lastId'] as int;
+    }
+    return 0; // Return 0 if there are no sales records
+  }
+
   Future<int> deleteGroup(int id) async {
     final db = await instance.database;
     return await db.delete(
@@ -160,5 +213,83 @@ class DatabaseHelper {
       print('Error searching products: $e');
       return [];
     }
+  }
+
+  Future<int> insertSales(Sales sales) async {
+    final db = await instance.database;
+    return await db.insert('sales', sales.toMap());
+  }
+
+  Future<int> insertSalesItem(SalesItem salesItem) async {
+    final db = await instance.database;
+    return await db.insert('sales_items', salesItem.toMap());
+  }
+
+  Future<int> updateSalesItem(SalesItem salesItem) async {
+    final db = await instance.database;
+    return await db.update(
+      'sales_items',
+      salesItem.toMap(),
+      where: 'id = ?',
+      whereArgs: [salesItem.id],
+    );
+  }
+
+  Future<int> insertReturn(Return returnItem) async {
+    final db = await instance.database;
+    return await db.insert('returns', returnItem.toMap());
+  }
+
+  Future<List<Sales>> getAllSales() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('sales');
+    return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
+  }
+
+  Future<List<SalesItem>> getSalesItems(int salesId) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'sales_items',
+      where: 'salesId = ?',
+      whereArgs: [salesId],
+    );
+    return List.generate(maps.length, (i) => SalesItem.fromMap(maps[i]));
+  }
+
+  Future<List<Sales>> searchSalesById(String salesId) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'sales',
+      where: 'id LIKE ?',
+      whereArgs: ['%$salesId%'],
+    );
+    return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
+  }
+
+  Future<List<Sales>> searchSalesByDateRange(
+      DateTime start, DateTime end) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'sales',
+      where: 'date BETWEEN ? AND ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+    );
+    return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
+  }
+
+  Future<List<Return>> getAllReturns() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('returns');
+    return List.generate(maps.length, (i) => Return.fromMap(maps[i]));
+  }
+
+  Future<List<Return>> getRefundsForSales(int salesId) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'returns',
+      where: 'salesItemId IN (SELECT id FROM sales_items WHERE salesId = ?)',
+      whereArgs: [salesId],
+    );
+    return List.generate(maps.length, (i) => Return.fromMap(maps[i]));
   }
 }

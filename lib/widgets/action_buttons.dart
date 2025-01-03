@@ -19,7 +19,7 @@ class ActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 69,
+      height: 60,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
@@ -29,28 +29,28 @@ class ActionButtons extends StatelessWidget {
             textColor: Colors.black,
             onPressed: onNewPressed,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           _buildActionButton(
             text: 'Group',
             backgroundColor: const Color(0xFFFFE500),
             textColor: Colors.black,
             onPressed: onGroupPressed,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           _buildActionButton(
             text: 'Update',
             backgroundColor: const Color(0xFF39B54A),
             textColor: Colors.white,
             onPressed: onUpdatePressed,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           _buildActionButton(
             text: 'History',
             backgroundColor: const Color(0xFF6B42FF),
             textColor: Colors.white,
             onPressed: onHistoryPressed,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           _buildActionButton(
             text: 'Security',
             backgroundColor: const Color(0xFFFF4244),
@@ -79,12 +79,12 @@ class ActionButtons extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           onTap: onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16.5),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             child: Text(
               text,
               style: TextStyle(
                 color: textColor,
-                fontSize: 24,
+                fontSize: 16,
                 fontFamily: 'Inter',
                 fontWeight: FontWeight.w700,
               ),
