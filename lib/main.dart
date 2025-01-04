@@ -1,22 +1,26 @@
+import 'dart:io'; // Required for Platform checks
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/screens/home_page.dart';
-import 'package:paylink_pos/screens/home_screen.dart';
-import 'package:paylink_pos/screens/login_screen.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'screens/home_page.dart';
+import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/product_list_screen.dart';
 import 'screens/add_product_screen.dart';
 import 'screens/selling_screen.dart';
 import 'screens/bill_screen.dart';
 
-void main() {
+void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize FFI loader
-  sqfliteFfiInit();
+  // Check platform and initialize SQLite database factory
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
 
-  // Set the database factory
-  databaseFactory = databaseFactoryFfi;
   runApp(const POSApp());
 }
 
@@ -27,7 +31,7 @@ class POSApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      restorationScopeId: "Test", // <-- Add this line
+      restorationScopeId: "Test",
       title: 'POS System',
       theme: ThemeData(
         primarySwatch: Colors.blue,
