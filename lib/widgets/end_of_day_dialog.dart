@@ -135,53 +135,134 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
-          title: const Text(
-            'Sales Items',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              itemCount: _salesItems.length,
-              itemBuilder: (context, index) {
-                final item = _salesItems[index];
-                return ListTile(
-                  title: Text(item.name, style: TextStyle(color: Colors.white)),
-                  subtitle: Text(
-                      'Quantity: ${item.quantity}, Total: ${item.total}',
-                      style: TextStyle(color: Colors.white)),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return AlertDialog(
+              backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+              contentPadding: EdgeInsets.zero,
+              content: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Sales Items',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: 800,
+                          height: 600,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.vertical,
+                              child: DataTable(
+                                headingRowColor: MaterialStateProperty.all(
+                                    const Color.fromARGB(56, 131, 131, 128)),
+                                dataRowColor:
+                                    MaterialStateProperty.resolveWith<Color>(
+                                  (Set<MaterialState> states) {
+                                    if (states
+                                        .contains(MaterialState.selected)) {
+                                      return Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withOpacity(0.08);
+                                    }
+                                    return Colors.white.withAlpha(8);
+                                  },
+                                ),
+                                columns: const [
+                                  DataColumn(
+                                      label: Text('Name',
+                                          style:
+                                              TextStyle(color: Colors.white))),
+                                  DataColumn(
+                                      label: Text('Quantity',
+                                          style:
+                                              TextStyle(color: Colors.white))),
+                                  DataColumn(
+                                      label: Text('Total',
+                                          style:
+                                              TextStyle(color: Colors.white))),
+                                  DataColumn(
+                                      label: Text('Discount',
+                                          style:
+                                              TextStyle(color: Colors.white))),
+                                  DataColumn(
+                                      label: Text('Final Price',
+                                          style:
+                                              TextStyle(color: Colors.white))),
+                                ],
+                                rows: _salesItems.map((item) {
+                                  final double finalPrice =
+                                      item.total - item.discount;
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text(item.name,
+                                          style: const TextStyle(
+                                              color: Colors.white))),
+                                      DataCell(Text('${item.quantity}',
+                                          style: const TextStyle(
+                                              color: Colors.white))),
+                                      DataCell(Text('${item.total}',
+                                          style: const TextStyle(
+                                              color: Colors.white))),
+                                      DataCell(Text('${item.discount}',
+                                          style: const TextStyle(
+                                              color: Colors.white))),
+                                      DataCell(Text('${finalPrice}',
+                                          style: const TextStyle(
+                                              color: Colors.white))),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 10,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  void _showMostSoldItems() async {
-    final mostSoldItems = await DatabaseHelper.instance.getMostSoldItems();
-    print('Most sold items to display: ${mostSoldItems.length}');
-    for (var item in mostSoldItems) {
-      print('Item: ${item.name}, Quantity: ${item.quantity}');
+  void _showTopSoldItem() async {
+    final topSoldItem = await DatabaseHelper.instance.getTopSoldItem();
+    if (topSoldItem != null) {
+      _showItemDialog('Top Sold Item', topSoldItem);
+    } else {
+      _showMessageDialog('No sales data available for today.');
     }
-    _showItemsDialog('Most Sold Items', mostSoldItems);
   }
 
-  void _showLeastSoldItems() async {
-    final leastSoldItems = await DatabaseHelper.instance.getLeastSoldItems();
-    _showItemsDialog('Least Sold Items', leastSoldItems);
+  void _showLeastSoldItem() async {
+    final leastSoldItem = await DatabaseHelper.instance.getLeastSoldItem();
+    if (leastSoldItem != null) {
+      _showItemDialog('Least Sold Item', leastSoldItem);
+    } else {
+      _showMessageDialog('No sales data available for today.');
+    }
   }
 
-  void _showItemsDialog(String title, List<SalesItem> items) {
+  void _showItemDialog(String title, SalesItem item) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -191,24 +272,34 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
             title,
             style: TextStyle(color: Colors.white),
           ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return ListTile(
-                  title: Text(
-                    item.name,
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(
-                    'Quantity: ${item.quantity}',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                );
-              },
+          content: Text(
+            'Item: ${item.name}\nQuantity: ${item.quantity}',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close', style: TextStyle(color: Colors.white)),
             ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showMessageDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+          title: const Text(
+            'Information',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            message,
+            style: TextStyle(color: Colors.white),
           ),
           actions: [
             TextButton(
@@ -299,34 +390,82 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                   ],
                 ),
               ),
-              SizedBox(
-                height: 10,
-              ),
+              const Divider(color: Colors.white),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  ElevatedButton(
-                    onPressed: _showMostSoldItems,
-                    child: const Text('Most Sold Items'),
+                  Expanded(
+                    child: _buildInfoContainer(
+                      'Sales Count',
+                      '$_salesCount',
+                      Colors.green,
+                    ),
                   ),
-                  ElevatedButton(
-                    onPressed: _showLeastSoldItems,
-                    child: const Text('Least Sold Items'),
+                  const SizedBox(width: 8), // Space between containers
+                  Expanded(
+                    child: _buildInfoContainer(
+                      'Total Amount',
+                      '$_totalAmount LKR',
+                      Colors.red,
+                    ),
+                  ),
+                  const SizedBox(width: 8), // Space between containers
+                  Expanded(
+                    child: FutureBuilder<SalesItem?>(
+                      future: DatabaseHelper.instance.getTopSoldItem(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else if (snapshot.hasData && snapshot.data != null) {
+                          final item = snapshot.data!;
+                          return _buildInfoContainer(
+                            'Top Sold Item',
+                            '${item.name}\n' '''       ''' '(${item.quantity})',
+                            Colors.amber,
+                          );
+                        } else {
+                          return _buildInfoContainer(
+                            'Top Sold Item',
+                            'No Data',
+                            Colors.amber,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8), // Space between containers
+                  Expanded(
+                    child: FutureBuilder<SalesItem?>(
+                      future: DatabaseHelper.instance.getLeastSoldItem(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else if (snapshot.hasData && snapshot.data != null) {
+                          final item = snapshot.data!;
+                          return _buildInfoContainer(
+                            'Least Sold Item',
+                            '${item.name}\n'
+                                '''              '''
+                                '(${item.quantity})',
+                            Colors.grey,
+                          );
+                        } else {
+                          return _buildInfoContainer(
+                            'Least Sold Item',
+                            'No Data',
+                            Colors.grey,
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),
               const Divider(color: Colors.white),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Text(
-                    'Sales count: $_salesCount',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  Text(
-                    'Total amount: $_totalAmount LKR',
-                    style: const TextStyle(color: Colors.white),
-                  ),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Close'),
@@ -335,6 +474,41 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoContainer(String title, String value, Color color) {
+    return Container(
+      height: 110, // Fixed height for all containers
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14, // Smaller font size for the title
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18, // Larger font size for the value
+              ),
+            ),
+          ],
         ),
       ),
     );

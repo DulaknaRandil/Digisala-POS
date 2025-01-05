@@ -189,61 +189,67 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
   }
 
-  Future<List<SalesItem>> getMostSoldItems() async {
-    final db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.rawQuery('''
-    SELECT name, SUM(quantity) as totalQuantity
-    FROM sales_items
-    GROUP BY name
-    ORDER BY totalQuantity DESC
-    LIMIT 5
-  ''');
-
-    print('Most sold items fetched: ${maps.length}');
-    for (var map in maps) {
-      print('Item: ${map['name']}, Quantity: ${map['totalQuantity']}');
-    }
-
-    return maps.map((map) {
-      return SalesItem(
-        id: null, // No ID in aggregated results
-        salesId: 0, // No salesId in aggregated results
-        name: map['name'],
-        quantity: map['totalQuantity'],
-        price: 0.0, // Price not relevant in aggregated results
-        discount: 0.0, // Discount not relevant in aggregated results
-        total: 0.0, // Total not relevant in aggregated results
-        refund: false, // Refund not relevant in aggregated results
-      );
-    }).toList();
-  }
-
-  Future<List<SalesItem>> getLeastSoldItems() async {
+  Future<SalesItem?> getTopSoldItem() async {
     final db = await instance.database;
     final today = DateTime.now().toIso8601String().split('T').first;
-    print('Querying least sold items for date: $today');
+    print('Querying top sold item for date: $today');
 
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
-    SELECT name, SUM(quantity) as totalQuantity
-    FROM sales_items
-    WHERE salesId IN (SELECT id FROM sales WHERE date = ?)
-    GROUP BY name
-    ORDER BY totalQuantity ASC
-    LIMIT 5
-  ''', [today]);
+  SELECT name, SUM(quantity) as totalQuantity
+  FROM sales_items
+  WHERE salesId IN (SELECT id FROM sales WHERE date LIKE ?)
+  GROUP BY name
+  ORDER BY totalQuantity DESC
+  LIMIT 1
+  ''', ['$today%']); // Use LIKE to ensure date format matches
 
-    print('Least sold items fetched: ${maps.length}');
-    return List.generate(maps.length, (i) => SalesItem.fromMap(maps[i]));
+    if (maps.isNotEmpty) {
+      final map = maps.first;
+      print('Top sold item: ${map['name']}, Quantity: ${map['totalQuantity']}');
+      return SalesItem(
+        id: null,
+        salesId: 0,
+        name: map['name'],
+        quantity: map['totalQuantity'],
+        price: 0.0,
+        discount: 0.0,
+        total: 0.0,
+        refund: false,
+      );
+    }
+    return null;
   }
 
-  Future<int> getLastSalesId() async {
+  Future<SalesItem?> getLeastSoldItem() async {
     final db = await instance.database;
-    final List<Map<String, dynamic>> result =
-        await db.rawQuery('SELECT MAX(id) as lastId FROM sales');
-    if (result.isNotEmpty && result.first['lastId'] != null) {
-      return result.first['lastId'] as int;
+    final today = DateTime.now().toIso8601String().split('T').first;
+    print('Querying least sold item for date: $today');
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+  SELECT name, SUM(quantity) as totalQuantity
+  FROM sales_items
+  WHERE salesId IN (SELECT id FROM sales WHERE date LIKE ?)
+  GROUP BY name
+  ORDER BY totalQuantity ASC
+  LIMIT 1
+  ''', ['$today%']); // Use LIKE to ensure date format matches
+
+    if (maps.isNotEmpty) {
+      final map = maps.first;
+      print(
+          'Least sold item: ${map['name']}, Quantity: ${map['totalQuantity']}');
+      return SalesItem(
+        id: null,
+        salesId: 0,
+        name: map['name'],
+        quantity: map['totalQuantity'],
+        price: 0.0,
+        discount: 0.0,
+        total: 0.0,
+        refund: false,
+      );
     }
-    return 0; // Return 0 if there are no sales records
+    return null;
   }
 
   Future<int> deleteGroup(int id) async {

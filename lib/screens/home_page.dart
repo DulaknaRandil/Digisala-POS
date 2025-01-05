@@ -296,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return NewProductForm(
+        return ProductForm(
           onSave: (productData) {
             print('New Product: $productData');
             Navigator.of(context).pushNamed('/dashboard');
@@ -304,6 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onClose: () {
             Navigator.of(context).pop();
           },
+          searchBarFocusNode: _searchBarFocusNode,
         );
       },
     );
