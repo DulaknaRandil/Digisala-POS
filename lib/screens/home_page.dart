@@ -30,11 +30,20 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Product> _checkoutList = [];
   final DiscountManager _discountManager = DiscountManager();
   int _currentSalesId = 1;
+  late FocusNode _searchBarFocusNode;
+
   @override
   void initState() {
     super.initState();
     _initializeSalesId();
     _loadProducts();
+    _searchBarFocusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _searchBarFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProducts() async {
@@ -53,15 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _addProductToCheckout(Product product) {
     setState(() {
-      // Attempt to find the existing product in the checkout list
       final existingProductIndex =
           _checkoutList.indexWhere((p) => p.id == product.id);
 
       if (existingProductIndex != -1) {
-        // If the product exists, increase its quantity by 1
         _checkoutList[existingProductIndex].quantity += 1;
       } else {
-        // If the product does not exist, add it with an initial quantity of 1
         product.quantity = 1;
         _checkoutList.add(product);
       }
@@ -72,8 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _updateProduct(Product product, int change) async {
     setState(() {
       product.quantity += change;
-      if (product.quantity < 1)
-        product.quantity = 1; // Ensure quantity is at least 1
+      if (product.quantity < 1) product.quantity = 1;
     });
     _loadProducts();
   }
@@ -93,11 +98,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleVoidOrder() {
-    setState(() {
-      _checkoutList.clear();
-      _discountManager.reset();
-    });
-    print('Order has been voided.');
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+          title: Text(
+            'Confirm Void Order',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text('Are you sure you want to void the order?',
+              style: TextStyle(color: Colors.white)),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: Text('Cancel', style: TextStyle(color: Colors.white)),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _checkoutList.clear();
+                  _discountManager.reset();
+                });
+                Navigator.of(context).pop(); // Close the dialog
+                _searchBarFocusNode.requestFocus(); // Focus the search bar
+                print('Order has been voided.');
+              },
+              child: Text('Confirm', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   double _calculateTotal() {
@@ -181,10 +215,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _printReceipt(sales, salesId);
 
-    // Clear the order summary and product list
     setState(() {
       _checkoutList.clear();
       _discountManager.reset();
+      _searchBarFocusNode.requestFocus();
       _currentSalesId++;
     });
   }
@@ -318,6 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 custom.SearchBar(
                   onAddProduct: _addProductToCheckout,
+                  focusNode: _searchBarFocusNode, // Pass the focus node
                 ),
                 const Spacer(),
                 IconButton(
@@ -334,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 80,
+                    width: 25,
                   ),
                   Column(
                     children: [
@@ -354,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       SizedBox(
-                        height: 10,
+                        height: 90,
                       ),
                       ActionButtons(
                         onNewPressed: _showNewProductForm,
@@ -365,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(width: 40),
+                  const SizedBox(width: 70),
                   OrderSummary(
                     products: _checkoutList,
                     onClose: _handleClose,
@@ -373,8 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPayment: _handlePayment,
                     onCashPayment: _handleCashPayment,
                     onCardPayment: _handleCardPayment,
-                    discountManager:
-                        _discountManager, // Pass the DiscountManager
+                    discountManager: _discountManager,
                     salesId: _currentSalesId,
                   ),
                 ],
@@ -383,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
             const Divider(color: Color(0xFF2D2D2D), thickness: 1),
             Footer(
-              onVoidOrder: _handleVoidOrder, // Pass the callback here
+              onVoidOrder: _handleVoidOrder,
               onPayment: _handlePayment,
             ),
           ],

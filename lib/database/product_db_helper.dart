@@ -173,6 +173,69 @@ class DatabaseHelper {
     );
   }
 
+  Future<List<Sales>> getSalesByDate(DateTime date) async {
+    final db = await instance.database;
+    final String formattedDate =
+        date.toIso8601String().split('T').first; // Extract the date part
+    print('Querying sales for date: $formattedDate');
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'sales',
+      where: 'date LIKE ?',
+      whereArgs: ['$formattedDate%'], // Use LIKE to match the date part
+    );
+
+    print('Sales fetched: ${maps.length}');
+    return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
+  }
+
+  Future<List<SalesItem>> getMostSoldItems() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+    SELECT name, SUM(quantity) as totalQuantity
+    FROM sales_items
+    GROUP BY name
+    ORDER BY totalQuantity DESC
+    LIMIT 5
+  ''');
+
+    print('Most sold items fetched: ${maps.length}');
+    for (var map in maps) {
+      print('Item: ${map['name']}, Quantity: ${map['totalQuantity']}');
+    }
+
+    return maps.map((map) {
+      return SalesItem(
+        id: null, // No ID in aggregated results
+        salesId: 0, // No salesId in aggregated results
+        name: map['name'],
+        quantity: map['totalQuantity'],
+        price: 0.0, // Price not relevant in aggregated results
+        discount: 0.0, // Discount not relevant in aggregated results
+        total: 0.0, // Total not relevant in aggregated results
+        refund: false, // Refund not relevant in aggregated results
+      );
+    }).toList();
+  }
+
+  Future<List<SalesItem>> getLeastSoldItems() async {
+    final db = await instance.database;
+    final today = DateTime.now().toIso8601String().split('T').first;
+    print('Querying least sold items for date: $today');
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+    SELECT name, SUM(quantity) as totalQuantity
+    FROM sales_items
+    WHERE salesId IN (SELECT id FROM sales WHERE date = ?)
+    GROUP BY name
+    ORDER BY totalQuantity ASC
+    LIMIT 5
+  ''', [today]);
+
+    print('Least sold items fetched: ${maps.length}');
+    return List.generate(maps.length, (i) => SalesItem.fromMap(maps[i]));
+  }
+
   Future<int> getLastSalesId() async {
     final db = await instance.database;
     final List<Map<String, dynamic>> result =

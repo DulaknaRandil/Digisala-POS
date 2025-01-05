@@ -7,12 +7,14 @@ class SearchBar extends StatefulWidget {
   final Function(Product) onAddProduct;
   final String? initialValue;
   final String? hintText;
+  final FocusNode? focusNode; // Add focusNode parameter
 
   const SearchBar({
     Key? key,
     required this.onAddProduct,
     this.initialValue,
     this.hintText = 'Search by barcode, name or ID',
+    this.focusNode, // Initialize focusNode
   }) : super(key: key);
 
   @override
@@ -21,25 +23,38 @@ class SearchBar extends StatefulWidget {
 
 class _SearchBarState extends State<SearchBar> {
   late TextEditingController _controller;
+  late FocusNode _focusNode;
   List<Product> _searchResults = [];
-  int _highlightedIndex = -1; // Track the highlighted item
+  int _highlightedIndex = -1;
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
+  String? _lastProcessedBarcode;
+  bool _isProcessingBarcode = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
+    _focusNode = widget.focusNode ??
+        FocusNode(); // Use provided focusNode or create a new one
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _hideOverlay();
+    if (widget.focusNode == null) {
+      _focusNode.dispose(); // Dispose only if it was created here
+    }
     _controller.dispose();
     super.dispose();
   }
 
   void _showOverlay() {
+    if (_isProcessingBarcode)
+      return; // Prevent showing overlay during barcode processing
     _hideOverlay();
     final overlay = Overlay.of(context);
     _overlayEntry = OverlayEntry(
@@ -90,47 +105,93 @@ class _SearchBarState extends State<SearchBar> {
     _overlayEntry = null;
   }
 
+  bool _isBarcodeMatch(String value, Product product) {
+    return product.barcode == value && value.length >= 5;
+  }
+
   void _handleSearch(String value) async {
     if (value.isEmpty) {
       setState(() {
         _searchResults = [];
         _highlightedIndex = -1;
+        _lastProcessedBarcode = null;
       });
       _hideOverlay();
       return;
     }
 
+    // Prevent processing if this barcode was just processed
+    if (value == _lastProcessedBarcode) {
+      return;
+    }
+
     try {
       final results = await DatabaseHelper.instance.searchProducts(value);
+
+      if (results.isEmpty) {
+        setState(() {
+          _searchResults = [];
+          _highlightedIndex = -1;
+        });
+        _hideOverlay();
+        return;
+      }
+
+      // Check if this is a barcode scan
+      if (results.length == 1 && _isBarcodeMatch(value, results[0])) {
+        _isProcessingBarcode = true;
+        _lastProcessedBarcode = value;
+        _addProduct(results[0]);
+
+        // Clear text and request focus immediately
+        _controller.clear();
+        _focusNode.requestFocus();
+        _isProcessingBarcode = false;
+
+        _hideOverlay();
+        return;
+      }
+
       setState(() {
         _searchResults = results;
-        _highlightedIndex = results.isNotEmpty ? 0 : -1;
+        _highlightedIndex = 0;
+        _lastProcessedBarcode = null;
       });
-      if (results.isNotEmpty) {
-        _showOverlay();
-      } else {
-        _hideOverlay();
-      }
+      _showOverlay();
     } catch (e) {
       print('Error searching products: $e');
       _hideOverlay();
     }
   }
 
+  void _addProduct(Product product) {
+    if (!_isProcessingBarcode) {
+      widget.onAddProduct(product);
+    }
+  }
+
   void _selectProduct(Product product) {
-    widget.onAddProduct(product);
-    _controller.clear(); // Clear the search bar
-    _hideOverlay();
+    if (_isProcessingBarcode)
+      return; // Prevent selection during barcode processing
+    _addProduct(product);
+    _controller.clear();
     setState(() {
       _highlightedIndex = -1;
       _searchResults = [];
+      _lastProcessedBarcode = null;
+    });
+    _hideOverlay();
+
+    // Request focus after a short delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
     });
   }
 
-  void _handleKeyNavigation(RawKeyEvent event) {
-    if (_searchResults.isEmpty) return;
+  void _handleKeyNavigation(KeyEvent event) {
+    if (_searchResults.isEmpty || _isProcessingBarcode) return;
 
-    if (event is RawKeyDownEvent) {
+    if (event is KeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
         setState(() {
           _highlightedIndex = (_highlightedIndex + 1) % _searchResults.length;
@@ -151,9 +212,9 @@ class _SearchBarState extends State<SearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    return RawKeyboardListener(
+    return KeyboardListener(
       focusNode: FocusNode(),
-      onKey: _handleKeyNavigation,
+      onKeyEvent: _handleKeyNavigation,
       child: CompositedTransformTarget(
         link: _layerLink,
         child: Container(
@@ -168,6 +229,7 @@ class _SearchBarState extends State<SearchBar> {
               Expanded(
                 child: TextField(
                   controller: _controller,
+                  focusNode: _focusNode,
                   onChanged: _handleSearch,
                   decoration: InputDecoration(
                     hintText: widget.hintText,
@@ -176,7 +238,7 @@ class _SearchBarState extends State<SearchBar> {
                   ),
                 ),
               ),
-              Container(
+              SizedBox(
                 width: 98,
                 height: 60,
                 child: ElevatedButton(

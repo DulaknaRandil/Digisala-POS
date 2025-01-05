@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:paylink_pos/models/product_model.dart';
 import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/utils/pdf_serviceS_stock.dart';
+import 'package:paylink_pos/utils/pdf_service_stock.dart';
 
 class StockDialog extends StatefulWidget {
   const StockDialog({Key? key}) : super(key: key);

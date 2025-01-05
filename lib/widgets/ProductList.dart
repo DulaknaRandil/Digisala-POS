@@ -20,51 +20,67 @@ class ProductList extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
         child: DataTable(
-          headingRowColor: MaterialStateColor.resolveWith((states) =>
-              Colors.blueGrey.shade900), // Header row background color
+          columnSpacing: 100,
+          headingRowColor: MaterialStateColor.resolveWith(
+            (states) => Colors.blueGrey.shade900,
+          ),
           columns: [
             DataColumn(
-                label: Text(
-              'Product Name',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            )),
+              label: Text(
+                'Product Name',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
             DataColumn(
-                label: Text(
-              'Unit Price',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            )),
+              label: Text(
+                'Unit Price',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
             DataColumn(
-                label: Text(
-              'Total Price',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            )),
+              label: Text(
+                'Total Price',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
             DataColumn(
-                headingRowAlignment: MainAxisAlignment.center,
-                label: Text(
-                  'Quantity',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
-                )),
+              label: Text(
+                'Quantity',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
             DataColumn(
-                label: Text(
-              'Actions',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            )),
+              label: Text(
+                'Actions',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
           rows: products.map((product) {
             return DataRow(
               cells: [
-                DataCell(Text(
-                  product.name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white, // Name color
+                DataCell(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: 150, // Set the maximum width of the cell
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Text(
+                        product.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
-                )),
+                ),
                 DataCell(Text(
                   '${product.price.toStringAsFixed(2)} LKR',
                   style: TextStyle(color: Colors.white),
@@ -77,7 +93,6 @@ class ProductList extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Decrease Button
                       InkWell(
                         onTap: () =>
                             onQuantityChange(product.id.toString(), -1),
@@ -92,7 +107,6 @@ class ProductList extends StatelessWidget {
                               color: Colors.white, size: 18),
                         ),
                       ),
-                      // Quantity Text
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
@@ -104,7 +118,6 @@ class ProductList extends StatelessWidget {
                           ),
                         ),
                       ),
-                      // Increase Button
                       InkWell(
                         onTap: () => onQuantityChange(product.id.toString(), 1),
                         borderRadius: BorderRadius.circular(8),

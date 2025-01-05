@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
+import 'package:paylink_pos/widgets/end_of_day_dialog.dart';
 import 'dart:async';
 
 import 'package:paylink_pos/widgets/stock_dialog.dart';
@@ -62,6 +64,55 @@ class _FooterState extends State<Footer> {
     );
   }
 
+  void _showEndOfDayDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const EndOfDayDialog(); // Use the EndOfDayDialog
+      },
+    );
+  }
+
+  void _showLogoutConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+          title: const Text(
+            'Confirm Logout',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Are you sure you want to log out?',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.white),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushNamed(context, '/login');
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -84,11 +135,9 @@ class _FooterState extends State<Footer> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.logout, color: Colors.black),
-              onPressed: () {
-                // Handle logout action
-                Navigator.pushNamed(context, '/login');
-              },
+              icon: const Icon(HugeIcons.strokeRoundedLogin02,
+                  color: Colors.black),
+              onPressed: _showLogoutConfirmationDialog,
             ),
           ),
           const SizedBox(width: 16),
@@ -123,9 +172,8 @@ class _FooterState extends State<Footer> {
           ),
           const Spacer(),
           _buildActionButton('Void Order', Colors.red, widget.onVoidOrder),
-          _buildActionButton('End of Day', Colors.lightBlue, () {
-            // Handle End of Day action
-          }),
+          _buildActionButton(
+              'End of Day', Colors.lightBlue, _showEndOfDayDialog),
           _buildActionButton('Stock', Colors.pinkAccent, () {
             _showStockDialog();
           }),

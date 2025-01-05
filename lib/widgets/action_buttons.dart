@@ -57,6 +57,9 @@ class ActionButtons extends StatelessWidget {
             textColor: Colors.white,
             onPressed: onSecurityPressed,
           ),
+          SizedBox(
+            width: 300,
+          )
         ],
       ),
     );
