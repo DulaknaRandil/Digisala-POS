@@ -1,8 +1,8 @@
-import 'package:paylink_pos/models/group_model.dart';
-import 'package:paylink_pos/models/product_model.dart';
-import 'package:paylink_pos/models/salesItem_model.dart';
-import 'package:paylink_pos/models/sales_model.dart';
-import 'package:paylink_pos/models/return_model.dart';
+import 'package:digisala_pos/models/group_model.dart';
+import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/models/salesItem_model.dart';
+import 'package:digisala_pos/models/sales_model.dart';
+import 'package:digisala_pos/models/return_model.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/models/product_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/product_model.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({super.key});

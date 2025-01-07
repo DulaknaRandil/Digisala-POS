@@ -1,6 +1,6 @@
 {
-    "name": "paylink_pos",
-    "short_name": "paylink_pos",
+    "name": "digisala_pos",
+    "short_name": "digisala_pos",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

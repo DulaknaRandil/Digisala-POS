@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/product_model.dart';
-import 'package:paylink_pos/widgets/discount%20widgets/discount_manager.dart';
-import 'package:paylink_pos/widgets/discount_calculator.dart';
+import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/widgets/discount%20widgets/discount_manager.dart';
+import 'package:digisala_pos/widgets/discount_calculator.dart';
 
 class OrderSummary extends StatefulWidget {
   final List<Product> products;

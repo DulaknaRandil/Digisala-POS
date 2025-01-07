@@ -1,14 +1,16 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/salesItem_model.dart';
-import 'package:paylink_pos/models/sales_model.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/salesItem_model.dart';
+import 'package:digisala_pos/models/sales_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 class EndOfDayDialog extends StatefulWidget {
-  const EndOfDayDialog({Key? key}) : super(key: key);
+  final FocusNode searchBarFocusNode;
+  const EndOfDayDialog({Key? key, required this.searchBarFocusNode})
+      : super(key: key);
 
   @override
   _EndOfDayDialogState createState() => _EndOfDayDialogState();
@@ -231,9 +233,11 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                     top: 0,
                     right: 10,
                     child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          widget.searchBarFocusNode.requestFocus();
+                        }),
                   ),
                 ],
               ),
@@ -359,9 +363,11 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                       ),
                       const SizedBox(width: 10),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            widget.searchBarFocusNode.requestFocus(); //
+                          }),
                     ],
                   ),
                 ],
@@ -467,7 +473,10 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.searchBarFocusNode.requestFocus();
+                    },
                     child: const Text('Close'),
                   ),
                 ],

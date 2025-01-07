@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:paylink_pos/models/product_model.dart';
+import 'package:digisala_pos/models/product_model.dart';
 
 class PdfService {
   static Future<Uint8List> generateStockReport({

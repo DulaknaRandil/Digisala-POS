@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "paylink_pos" "\0"
+            VALUE "FileDescription", "Digiසල POS" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "paylink_pos" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "paylink_pos.exe" "\0"
-            VALUE "ProductName", "paylink_pos" "\0"
+            VALUE "InternalName", "Digiසල POS" "\0"
+            VALUE "LegalCopyright", "Digisala POS © 2025 Deshcode IT Solutions. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Digiසල POS.exe" "\0"
+            VALUE "ProductName", "Digiසල POS" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

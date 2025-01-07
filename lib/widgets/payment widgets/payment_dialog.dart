@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/widgets/logo_component.dart';
+import 'package:digisala_pos/widgets/logo_component.dart';
 
 class PaymentDialog extends StatefulWidget {
   final double total;

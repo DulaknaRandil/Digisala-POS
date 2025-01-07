@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/product_model.dart';
+import 'package:digisala_pos/models/product_model.dart';
 
 class ProductList extends StatelessWidget {
   final List<Product> products;

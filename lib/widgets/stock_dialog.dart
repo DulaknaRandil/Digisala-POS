@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/product_model.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/utils/pdf_service_stock.dart';
+import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/utils/pdf_service_stock.dart';
 
 class StockDialog extends StatefulWidget {
-  const StockDialog({Key? key}) : super(key: key);
+  final FocusNode searchBarFocusNode;
+  const StockDialog({Key? key, required this.searchBarFocusNode})
+      : super(key: key);
 
   @override
   _StockDialogState createState() => _StockDialogState();
@@ -179,7 +181,10 @@ class _StockDialogState extends State<StockDialog> {
                     const SizedBox(width: 10),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        widget.searchBarFocusNode.requestFocus();
+                      },
                     ),
                   ],
                 ),
@@ -317,7 +322,7 @@ class _StockDialogState extends State<StockDialog> {
                           '${index + 1}',
                           style: TextStyle(
                             color: _currentPage == index
-                                ? Colors.blue
+                                ? Colors.lightBlue
                                 : Colors.white,
                           ),
                         ),
@@ -326,7 +331,10 @@ class _StockDialogState extends State<StockDialog> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    widget.searchBarFocusNode.requestFocus();
+                  },
                   child: const Text('Close'),
                 ),
               ],

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/database/group_db_helper.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/models/group_model.dart';
+import 'package:digisala_pos/database/group_db_helper.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/group_model.dart';
 
 class GroupForm extends StatefulWidget {
+  final FocusNode searchBarFocusNode;
+  GroupForm({required this.searchBarFocusNode});
+
   @override
   _GroupFormState createState() => _GroupFormState();
 }
@@ -72,6 +75,7 @@ class _GroupFormState extends State<GroupForm> {
     }
     _showSnackBar('Groups updated successfully!', Colors.green);
     Navigator.of(context).pop();
+    widget.searchBarFocusNode.requestFocus();
   }
 
   void _showSnackBar(String message, Color color) {
@@ -111,9 +115,11 @@ class _GroupFormState extends State<GroupForm> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.searchBarFocusNode.requestFocus();
+                    }),
               ],
             ),
             const SizedBox(height: 20),

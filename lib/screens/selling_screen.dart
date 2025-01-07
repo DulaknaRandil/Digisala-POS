@@ -1,7 +1,7 @@
 // lib/screens/selling_screen.dart
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/models/bill_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/bill_model.dart';
 
 class SellingScreen extends StatefulWidget {
   const SellingScreen({super.key});

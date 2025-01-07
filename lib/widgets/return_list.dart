@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/return_model.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/return_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 
 class ReturnListDialog extends StatelessWidget {
-  const ReturnListDialog({Key? key}) : super(key: key);
+  final FocusNode searchBarFocusNode;
+  const ReturnListDialog({Key? key, required this.searchBarFocusNode})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +35,11 @@ class ReturnListDialog extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      searchBarFocusNode.requestFocus();
+                    }),
               ],
             ),
             const Divider(color: Colors.white),
@@ -98,7 +102,10 @@ class ReturnListDialog extends StatelessWidget {
                   child: const Text('Print PDF'),
                 ),
                 ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    searchBarFocusNode.requestFocus();
+                  },
                   child: const Text('Close'),
                 ),
               ],

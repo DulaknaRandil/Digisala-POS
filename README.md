@@ -1,4 +1,4 @@
-# paylink_pos
+# digisala_pos
 
 A new Flutter project.
 

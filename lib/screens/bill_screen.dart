@@ -1,6 +1,6 @@
 // lib/screens/bill_screen.dart
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/bill_model.dart';
+import 'package:digisala_pos/models/bill_model.dart';
 
 class BillScreen extends StatelessWidget {
   const BillScreen({super.key});

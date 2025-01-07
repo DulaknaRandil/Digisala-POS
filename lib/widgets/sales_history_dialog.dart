@@ -1,16 +1,18 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/salesItem_model.dart';
-import 'package:paylink_pos/models/sales_model.dart';
-import 'package:paylink_pos/models/return_model.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/salesItem_model.dart';
+import 'package:digisala_pos/models/sales_model.dart';
+import 'package:digisala_pos/models/return_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 class SalesHistoryDialog extends StatefulWidget {
-  const SalesHistoryDialog({Key? key}) : super(key: key);
+  final FocusNode searchBarFocusNode;
+  const SalesHistoryDialog({Key? key, required this.searchBarFocusNode})
+      : super(key: key);
 
   @override
   _SalesHistoryDialogState createState() => _SalesHistoryDialogState();
@@ -236,9 +238,11 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                       ),
                       const SizedBox(width: 10),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            widget.searchBarFocusNode.requestFocus();
+                          }),
                     ],
                   ),
                 ],
@@ -328,7 +332,10 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                     style: const TextStyle(color: Colors.white),
                   ),
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.searchBarFocusNode.requestFocus();
+                    },
                     child: const Text('Close'),
                   ),
                 ],

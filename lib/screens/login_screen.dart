@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/widgets/logo_component.dart';
-import 'package:paylink_pos/widgets/pin_entry_component.dart';
+import 'package:digisala_pos/widgets/logo_component.dart';
+import 'package:digisala_pos/widgets/pin_entry_component.dart';
 
 class LoginScreen extends StatelessWidget {
   @override

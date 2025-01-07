@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:paylink_pos/models/product_model.dart';
-import 'package:paylink_pos/models/salesItem_model.dart';
-import 'package:paylink_pos/models/sales_model.dart';
-import 'package:paylink_pos/widgets/OrderSummary.dart';
-import 'package:paylink_pos/widgets/ProductList.dart';
-import 'package:paylink_pos/widgets/action_buttons.dart';
-import 'package:paylink_pos/widgets/add_group.dart';
-import 'package:paylink_pos/widgets/discount%20widgets/discount_manager.dart';
-import 'package:paylink_pos/widgets/discount_calculator.dart';
-import 'package:paylink_pos/widgets/footer.dart';
-import 'package:paylink_pos/widgets/logo_component.dart';
-import 'package:paylink_pos/widgets/new_product_form.dart';
-import 'package:paylink_pos/widgets/payment%20widgets/payment_dialog.dart';
-import 'package:paylink_pos/widgets/product_update.dart';
-import 'package:paylink_pos/widgets/return_list.dart';
-import 'package:paylink_pos/widgets/sales_history_dialog.dart' as salesHistory;
-import 'package:paylink_pos/widgets/search_bar.dart' as custom;
-import 'package:paylink_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/models/salesItem_model.dart';
+import 'package:digisala_pos/models/sales_model.dart';
+import 'package:digisala_pos/widgets/OrderSummary.dart';
+import 'package:digisala_pos/widgets/ProductList.dart';
+import 'package:digisala_pos/widgets/action_buttons.dart';
+import 'package:digisala_pos/widgets/add_group.dart';
+import 'package:digisala_pos/widgets/discount%20widgets/discount_manager.dart';
+import 'package:digisala_pos/widgets/discount_calculator.dart';
+import 'package:digisala_pos/widgets/footer.dart';
+import 'package:digisala_pos/widgets/logo_component.dart';
+import 'package:digisala_pos/widgets/new_product_form.dart';
+import 'package:digisala_pos/widgets/payment%20widgets/payment_dialog.dart';
+import 'package:digisala_pos/widgets/product_update.dart';
+import 'package:digisala_pos/widgets/return_list.dart';
+import 'package:digisala_pos/widgets/sales_history_dialog.dart' as salesHistory;
+import 'package:digisala_pos/widgets/search_bar.dart' as custom;
+import 'package:digisala_pos/database/product_db_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -255,7 +255,9 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return const salesHistory.SalesHistoryDialog();
+        return salesHistory.SalesHistoryDialog(
+          searchBarFocusNode: _searchBarFocusNode,
+        );
       },
     );
   }
@@ -264,7 +266,9 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return const ReturnListDialog();
+        return ReturnListDialog(
+          searchBarFocusNode: _searchBarFocusNode,
+        );
       },
     );
   }
@@ -314,7 +318,9 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return GroupForm();
+        return GroupForm(
+          searchBarFocusNode: _searchBarFocusNode,
+        );
       },
     );
   }
@@ -323,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return ProductUpdateForm();
+        return ProductUpdateForm(searchBarFocusNode: _searchBarFocusNode);
       },
     );
   }
@@ -390,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       SizedBox(
-                        height: 90,
+                        height: 15,
                       ),
                       ActionButtons(
                         onNewPressed: _showNewProductForm,
@@ -420,6 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Footer(
               onVoidOrder: _handleVoidOrder,
               onPayment: _handlePayment,
+              requestFocusNode: _searchBarFocusNode,
             ),
           ],
         ),

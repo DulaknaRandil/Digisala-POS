@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/models/product_model.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/product_model.dart';
 
 class SearchBar extends StatefulWidget {
   final Function(Product) onAddProduct;
@@ -128,7 +128,12 @@ class _SearchBarState extends State<SearchBar> {
     try {
       final results = await DatabaseHelper.instance.searchProducts(value);
 
-      if (results.isEmpty) {
+      // Filter out products with status 'deactivate' or quantity 0
+      final filteredResults = results.where((product) {
+        return product.status != 'Inactive' && product.quantity > 0;
+      }).toList();
+
+      if (filteredResults.isEmpty) {
         setState(() {
           _searchResults = [];
           _highlightedIndex = -1;
@@ -138,10 +143,11 @@ class _SearchBarState extends State<SearchBar> {
       }
 
       // Check if this is a barcode scan
-      if (results.length == 1 && _isBarcodeMatch(value, results[0])) {
+      if (filteredResults.length == 1 &&
+          _isBarcodeMatch(value, filteredResults[0])) {
         _isProcessingBarcode = true;
         _lastProcessedBarcode = value;
-        _addProduct(results[0]);
+        _addProduct(filteredResults[0]);
 
         // Clear text and request focus immediately
         _controller.clear();
@@ -153,7 +159,7 @@ class _SearchBarState extends State<SearchBar> {
       }
 
       setState(() {
-        _searchResults = results;
+        _searchResults = filteredResults;
         _highlightedIndex = 0;
         _lastProcessedBarcode = null;
       });

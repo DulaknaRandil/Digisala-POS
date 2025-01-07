@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:paylink_pos/database/product_db_helper.dart';
-import 'package:paylink_pos/models/group_model.dart';
-import 'package:paylink_pos/models/product_model.dart';
-import 'package:paylink_pos/widgets/product_add%20header.dart';
-import 'package:paylink_pos/widgets/product_add_save_button.dart';
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/group_model.dart';
+import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/widgets/product_add%20header.dart';
+import 'package:digisala_pos/widgets/product_add_save_button.dart';
 
 class ProductForm extends StatefulWidget {
   final Function(Map<String, dynamic>)? onSave;
@@ -80,10 +80,17 @@ class _ProductFormState extends State<ProductForm> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Add New Group'),
+          backgroundColor: _backgroundColor,
+          title: const Text(
+            'Add New Group',
+            style: TextStyle(color: _textColor),
+          ),
           content: TextField(
+            style: const TextStyle(color: Colors.white),
             controller: groupNameController,
-            decoration: const InputDecoration(hintText: 'Enter group name'),
+            decoration: const InputDecoration(
+                hintText: 'Enter group name',
+                hintStyle: TextStyle(color: Colors.white38)),
           ),
           actions: [
             TextButton(
@@ -93,11 +100,17 @@ class _ProductFormState extends State<ProductForm> {
                 _loadGroups(); // Refresh the group list
                 Navigator.of(context).pop();
               },
-              child: const Text('Add'),
+              child: const Text(
+                'Add',
+                style: TextStyle(color: _textColor),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: _textColor),
+              ),
             ),
           ],
         );
@@ -341,8 +354,8 @@ class _ProductFormState extends State<ProductForm> {
                           fontFamily: 'Inter',
                           fontWeight: FontWeight.w300,
                         ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 34, vertical: 12),
                         border: InputBorder.none,
                       ),
                     );
@@ -443,37 +456,41 @@ class _ProductFormState extends State<ProductForm> {
           width: 2,
         ),
       ),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
-        readOnly: readOnly,
-        onTap: onTap,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: _textColor,
-          fontSize: 18,
-          fontFamily: 'Inter',
-          fontWeight: FontWeight.w300,
-        ),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(
-            color: _textColor.withOpacity(0.8),
+      child: Center(
+        child: TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          readOnly: readOnly,
+          onTap: onTap,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: _textColor,
             fontSize: 18,
             fontFamily: 'Inter',
             fontWeight: FontWeight.w300,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          border: InputBorder.none,
-          suffixIcon: suffixIcon,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(
+              color: _textColor.withOpacity(0.8),
+              fontSize: 18,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w300,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: InputBorder.none,
+            suffixIcon: suffixIcon,
+          ),
+          validator: (value) {
+            if (controller != _expiryController &&
+                (value == null || value.isEmpty)) {
+              return 'This field is required';
+            }
+            return null;
+          },
         ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'This field is required';
-          }
-          return null;
-        },
       ),
     );
   }

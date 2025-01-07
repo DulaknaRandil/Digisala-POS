@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:paylink_pos/widgets/end_of_day_dialog.dart';
+import 'package:digisala_pos/widgets/end_of_day_dialog.dart';
 import 'dart:async';
 
-import 'package:paylink_pos/widgets/stock_dialog.dart';
+import 'package:digisala_pos/widgets/stock_dialog.dart';
 
 class Footer extends StatefulWidget {
   final String userRole;
   final String? avatarUrl;
   final VoidCallback onVoidOrder;
   final VoidCallback onPayment;
+  final FocusNode requestFocusNode;
 
   const Footer({
     Key? key,
     this.userRole = 'Admin',
-    this.avatarUrl =
-        'https://dashboard.codeparrot.ai/api/assets/Z3Ars5_bRV0pnkce',
+    this.avatarUrl = 'assets/user.png',
     required this.onVoidOrder,
     required this.onPayment,
+    required this.requestFocusNode,
   }) : super(key: key);
 
   @override
@@ -59,7 +60,9 @@ class _FooterState extends State<Footer> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return const StockDialog();
+        return StockDialog(
+          searchBarFocusNode: widget.requestFocusNode,
+        );
       },
     );
   }
@@ -68,7 +71,9 @@ class _FooterState extends State<Footer> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return const EndOfDayDialog(); // Use the EndOfDayDialog
+        return EndOfDayDialog(
+          searchBarFocusNode: widget.requestFocusNode,
+        ); // Use the EndOfDayDialog
       },
     );
   }
@@ -143,7 +148,7 @@ class _FooterState extends State<Footer> {
           const SizedBox(width: 16),
           CircleAvatar(
             radius: 32,
-            backgroundImage: NetworkImage(widget.avatarUrl ?? ''),
+            backgroundImage: AssetImage(widget.avatarUrl ?? ''),
           ),
           const SizedBox(width: 16),
           Column(
