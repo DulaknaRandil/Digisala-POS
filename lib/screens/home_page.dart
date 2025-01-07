@@ -66,13 +66,33 @@ class _HomeScreenState extends State<HomeScreen> {
           _checkoutList.indexWhere((p) => p.id == product.id);
 
       if (existingProductIndex != -1) {
-        _checkoutList[existingProductIndex].quantity += 1;
+        // Check if adding one more exceeds the available quantity
+        if (_checkoutList[existingProductIndex].quantity < product.quantity) {
+          _checkoutList[existingProductIndex].quantity += 1;
+        } else {
+          _showSnackBar(
+              'Cannot add more of ${product.name}, not enough stock.');
+        }
       } else {
-        product.quantity = 1;
-        _checkoutList.add(product);
+        // Check if there's at least one available in stock
+        if (product.quantity > 0) {
+          product.quantity = 1;
+          _checkoutList.add(product);
+        } else {
+          _showSnackBar('Cannot add ${product.name}, not enough stock.');
+        }
       }
     });
-    print('Product added: ${product.name}');
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.red,
+        content: Text(message),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _updateProduct(Product product, int change) async {
@@ -393,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 (p) => p.id.toString() == productId);
                             _removeProduct(product);
                           },
+                          searchBarFocusNode: _searchBarFocusNode,
                         ),
                       ),
                       SizedBox(

@@ -378,8 +378,8 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
               DataColumn(
                   label: Text('Method', style: TextStyle(color: Colors.white))),
               DataColumn(
-                  label:
-                      Text('Payment', style: TextStyle(color: Colors.white))),
+                  label: Text('Gross Price',
+                      style: TextStyle(color: Colors.white))),
               DataColumn(
                   label:
                       Text('Discount', style: TextStyle(color: Colors.white))),
@@ -461,6 +461,9 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
               DataColumn(
                   label: Text('Price', style: TextStyle(color: Colors.white))),
               DataColumn(
+                  label: Text('Gross Price',
+                      style: TextStyle(color: Colors.white))),
+              DataColumn(
                   label:
                       Text('Discount', style: TextStyle(color: Colors.white))),
               DataColumn(
@@ -491,9 +494,11 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                       style: const TextStyle(color: Colors.white))),
                   DataCell(Text('${item.price}',
                       style: const TextStyle(color: Colors.white))),
+                  DataCell(Text('${item.total}',
+                      style: const TextStyle(color: Colors.white))),
                   DataCell(Text('${item.discount}',
                       style: const TextStyle(color: Colors.white))),
-                  DataCell(Text('${item.total}',
+                  DataCell(Text('${item.total - item.discount}',
                       style: const TextStyle(color: Colors.white))),
                   DataCell(
                     refundedQuantity > 0

@@ -21,6 +21,8 @@ class _StockDialogState extends State<StockDialog> {
   int _currentPage = 0;
   final int _itemsPerPage = 5;
   List<String> _groupSuggestions = [];
+  List<Group> _groups = []; // Assuming you have a list of Group objects
+  final TextEditingController _groupController = TextEditingController();
 
   @override
   void initState() {
@@ -34,15 +36,14 @@ class _StockDialogState extends State<StockDialog> {
       _products = products;
       _displayedProducts = _filterProducts();
       _groupSuggestions = _getUniqueGroups();
+      _groups = _groupSuggestions.map((name) => Group(name: name)).toList();
     });
   }
 
   List<Product> _filterProducts() {
     List<Product> filtered = _products.where((product) {
       if (_selectedGroup == 'Group' && _searchQuery.isNotEmpty) {
-        return product.productGroup
-            .toLowerCase()
-            .contains(_searchQuery.toLowerCase());
+        return product.productGroup == _searchQuery;
       }
       if (_selectedGroup != 'All' && product.productGroup != _selectedGroup) {
         return false;
@@ -83,12 +84,9 @@ class _StockDialogState extends State<StockDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate stock levels for all filtered products, not just displayed ones
     final allFilteredProducts = _products.where((product) {
       if (_selectedGroup == 'Group' && _searchQuery.isNotEmpty) {
-        return product.productGroup
-            .toLowerCase()
-            .contains(_searchQuery.toLowerCase());
+        return product.productGroup == _searchQuery;
       }
       if (_selectedGroup != 'All' && product.productGroup != _selectedGroup) {
         return false;
@@ -113,7 +111,7 @@ class _StockDialogState extends State<StockDialog> {
       backgroundColor: Color.fromRGBO(2, 10, 27, 1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
       child: Container(
-        width: 800,
+        width: 1000,
         height: 600,
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -194,25 +192,26 @@ class _StockDialogState extends State<StockDialog> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    style: const TextStyle(color: Colors.white),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                        _displayedProducts = _filterProducts();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: _selectedGroup == 'Group'
-                          ? 'Search by group'
-                          : 'Search by name, barcode, or ID',
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white),
-                        onPressed: () {},
-                      ),
-                    ),
-                  ),
+                  child: _selectedGroup == 'Group'
+                      ? _buildGroupAutocomplete()
+                      : TextField(
+                          style: const TextStyle(color: Colors.white),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                              _displayedProducts = _filterProducts();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search by name, barcode, or ID',
+                            hintStyle: const TextStyle(color: Colors.white54),
+                            suffixIcon: IconButton(
+                              icon:
+                                  const Icon(Icons.search, color: Colors.white),
+                              onPressed: () {},
+                            ),
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 10),
                 DropdownButton<String>(
@@ -228,6 +227,7 @@ class _StockDialogState extends State<StockDialog> {
                   onChanged: (value) {
                     setState(() {
                       _selectedGroup = value!;
+                      _searchQuery = '';
                       _displayedProducts = _filterProducts();
                     });
                   },
@@ -262,13 +262,25 @@ class _StockDialogState extends State<StockDialog> {
                         label:
                             Text('ID', style: TextStyle(color: Colors.white))),
                     DataColumn(
+                        label: Text('Barcode',
+                            style: TextStyle(color: Colors.white))),
+                    DataColumn(
                         label: Text('Name',
+                            style: TextStyle(color: Colors.white))),
+                    DataColumn(
+                        label: Text('Expiry Date',
+                            style: TextStyle(color: Colors.white))),
+                    DataColumn(
+                        label: Text('Group',
                             style: TextStyle(color: Colors.white))),
                     DataColumn(
                         label: Text('Quantity',
                             style: TextStyle(color: Colors.white))),
                     DataColumn(
-                        label: Text('Group',
+                        label: Text('Price',
+                            style: TextStyle(color: Colors.white))),
+                    DataColumn(
+                        label: Text('Status',
                             style: TextStyle(color: Colors.white))),
                   ],
                   rows: _displayedProducts.map((product) {
@@ -286,11 +298,25 @@ class _StockDialogState extends State<StockDialog> {
                       cells: [
                         DataCell(Text('${product.id}',
                             style: const TextStyle(color: Colors.white))),
+                        DataCell(Text(product.barcode,
+                            style: const TextStyle(color: Colors.white))),
                         DataCell(Text(product.name,
+                            style: const TextStyle(color: Colors.white))),
+                        DataCell(Text(
+                            product.expiryDate != null
+                                ? product.expiryDate!
+                                    .toLocal()
+                                    .toString()
+                                    .split(' ')[0]
+                                : 'N/A',
+                            style: const TextStyle(color: Colors.white))),
+                        DataCell(Text(product.productGroup,
                             style: const TextStyle(color: Colors.white))),
                         DataCell(Text('${product.quantity}',
                             style: const TextStyle(color: Colors.white))),
-                        DataCell(Text(product.productGroup,
+                        DataCell(Text('${product.price.toStringAsFixed(2)} LKR',
+                            style: const TextStyle(color: Colors.white))),
+                        DataCell(Text(product.status,
                             style: const TextStyle(color: Colors.white))),
                       ],
                     );
@@ -368,4 +394,102 @@ class _StockDialogState extends State<StockDialog> {
       ),
     );
   }
+
+  Widget _buildGroupAutocomplete() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Autocomplete<Group>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return _groups; // Show all groups when input is empty
+                    }
+                    return _groups.where((Group group) {
+                      return group.name
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  displayStringForOption: (Group group) => group.name,
+                  onSelected: (Group selection) {
+                    setState(() {
+                      _groupController.text = selection.name;
+                      _searchQuery = selection.name;
+                      _displayedProducts = _filterProducts();
+                    });
+                  },
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onEditingComplete) {
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Type to search groups',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 18,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        border: InputBorder.none,
+                      ),
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        color: Color.fromRGBO(2, 10, 27, 1),
+                        elevation: 4.0,
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.25,
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: options.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final Group option = options.elementAt(index);
+                              return ListTile(
+                                title: Text(option.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                    )),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+}
+
+class Group {
+  final String name;
+
+  Group({required this.name});
 }

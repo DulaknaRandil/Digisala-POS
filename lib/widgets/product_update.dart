@@ -74,9 +74,12 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
   void _filterProducts() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredProducts = _products
-          .where((product) => product.name.toLowerCase().contains(query))
-          .toList();
+      _filteredProducts = _products.where((product) {
+        final nameMatches = product.name.toLowerCase().contains(query);
+        final idMatches = product.id.toString().contains(query);
+        final barcodeMatches = product.barcode.toLowerCase().contains(query);
+        return nameMatches || idMatches || barcodeMatches;
+      }).toList();
     });
   }
 
