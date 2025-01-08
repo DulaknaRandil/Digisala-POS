@@ -1,3 +1,5 @@
+import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:digisala_pos/models/product_model.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:digisala_pos/widgets/end_of_day_dialog.dart';
@@ -28,15 +30,30 @@ class Footer extends StatefulWidget {
 class _FooterState extends State<Footer> {
   late String _timeString;
   late Timer _timer;
+  List<Product> products = [];
+  int lowStockCount = 0;
+  int mediumStockCount = 0;
+  int highStockCount = 0; // Add this line if needed
+
+  Future<void> _loadProducts() async {
+    final _products = await DatabaseHelper.instance.getAllProducts();
+    setState(() {
+      products = _products;
+    });
+    _fetchStockCounts(); // Call this after products are loaded
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadProducts();
     _timeString = _formatDateTime(DateTime.now());
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+    _timer = Timer.periodic(const Duration(seconds: 5), (Timer t) {
       if (mounted) {
         setState(() {
           _timeString = _formatDateTime(DateTime.now());
+          _loadProducts();
+          _fetchStockCounts(); // Update stock counts every second
         });
       }
     });
@@ -54,6 +71,29 @@ class _FooterState extends State<Footer> {
         : dateTime.hour.toString().padLeft(2, '0');
     final String period = dateTime.hour >= 12 ? 'PM' : 'AM';
     return '$hour:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')} $period';
+  }
+
+  void _fetchStockCounts() {
+    final allFilteredProducts = products.where((product) {
+      return true;
+    }).toList();
+    print('Filtered products: ${allFilteredProducts.length}');
+    print(
+        'Low stock count: ${allFilteredProducts.where((p) => p.quantity < 5).length}');
+    print(
+        'Medium stock count: ${allFilteredProducts.where((p) => p.quantity >= 5 && p.quantity < 15).length}');
+    print(
+        'High stock count: ${allFilteredProducts.where((p) => p.quantity >= 15).length}');
+
+    setState(() {
+      _loadProducts();
+      lowStockCount = allFilteredProducts.where((p) => p.quantity < 5).length;
+      mediumStockCount = allFilteredProducts
+          .where((p) => p.quantity >= 5 && p.quantity < 15)
+          .length;
+      highStockCount =
+          allFilteredProducts.where((p) => p.quantity >= 15).length;
+    });
   }
 
   void _showStockDialog() {
@@ -179,9 +219,21 @@ class _FooterState extends State<Footer> {
           _buildActionButton('Void Order', Colors.red, widget.onVoidOrder),
           _buildActionButton(
               'End of Day', Colors.lightBlue, _showEndOfDayDialog),
-          _buildActionButton('Stock', Colors.pinkAccent, () {
-            _showStockDialog();
-          }),
+          Stack(
+            children: [
+              _buildActionButton('Stock ', Colors.teal, _showStockDialog),
+              Positioned(
+                right: 1,
+                top: -5,
+                child: _buildStockBubble(lowStockCount, Colors.red),
+              ),
+              Positioned(
+                right: 0, // Adjust this value to position the second bubble
+                bottom: 6,
+                child: _buildStockBubble(mediumStockCount, Colors.yellow),
+              ),
+            ],
+          ),
           _buildActionButton('Payment', Colors.green, widget.onPayment),
         ],
       ),
@@ -209,6 +261,24 @@ class _FooterState extends State<Footer> {
               color: Colors.white,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStockBubble(int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
