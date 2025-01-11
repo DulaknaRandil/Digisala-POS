@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
 import 'package:digisala_pos/models/sales_model.dart';
 import 'package:digisala_pos/models/return_model.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -339,6 +342,87 @@ class DatabaseHelper {
       whereArgs: ['%$salesId%'],
     );
     return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
+  }
+
+  Future<bool> exportDatabase() async {
+    try {
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, 'pos.db');
+
+      final dbFile = File(path);
+
+      if (await dbFile.exists()) {
+        String? selectedDirectory =
+            await FilePicker.platform.getDirectoryPath();
+        if (selectedDirectory != null) {
+          final backupPath = join(selectedDirectory, 'pos_backup.db');
+          final backupFile = File(backupPath);
+          await dbFile.copy(backupFile.path);
+          print('Database exported to ${backupFile.path}');
+          return true;
+        } else {
+          print('No directory selected.');
+        }
+      } else {
+        print('Database file does not exist.');
+      }
+    } catch (e) {
+      print('Error exporting database: $e');
+    }
+    return false;
+  }
+
+  Future<bool> importDatabase() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['db'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final backupPath = result.files.single.path!;
+        final dbPath = await getDatabasesPath();
+        final path = join(dbPath, 'pos.db');
+
+        final dbFile = File(path);
+        final backupFile = File(backupPath);
+
+        if (await backupFile.exists()) {
+          // Close the database before replacing it
+          await closeDatabase();
+
+          // Delete the existing database file
+          if (await dbFile.exists()) {
+            await dbFile.delete();
+          }
+
+          // Copy the backup file to the database path
+          await backupFile.copy(dbFile.path);
+          print('Database imported from ${backupFile.path}');
+
+          // Reopen the database
+          await reopenDatabase(path);
+          return true;
+        } else {
+          print('Backup file does not exist.');
+        }
+      } else {
+        print('No file selected.');
+      }
+    } catch (e) {
+      print('Error importing database: $e');
+    }
+    return false;
+  }
+
+  Future<void> closeDatabase() async {
+    final db = await instance.database;
+    await db.close();
+    _database = null; // Reset the database instance
+  }
+
+  Future<void> reopenDatabase(String path) async {
+    _database = await openDatabase(path);
   }
 
   Future<List<Sales>> searchSalesByDateRange(

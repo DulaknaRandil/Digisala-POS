@@ -31,6 +31,7 @@ class OrderSummary extends StatefulWidget {
 }
 
 class _OrderSummaryState extends State<OrderSummary> {
+  bool isDiscountButtonEnabled = true;
   double get subtotal => widget.products
       .fold(0, (sum, product) => sum + product.price * product.quantity);
 
@@ -121,6 +122,7 @@ class _OrderSummaryState extends State<OrderSummary> {
                   setState(() {
                     if (widget.discountManager.isItemMode) {
                       widget.discountManager.toggleMode();
+                      isDiscountButtonEnabled = true; // Enable the button
                     }
                   });
                 },
@@ -145,6 +147,7 @@ class _OrderSummaryState extends State<OrderSummary> {
                   setState(() {
                     if (!widget.discountManager.isItemMode) {
                       widget.discountManager.toggleMode();
+                      isDiscountButtonEnabled = false; // Disable the button
                     }
                   });
                 },
@@ -278,8 +281,13 @@ class _OrderSummaryState extends State<OrderSummary> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildButton('Discount', _openOrderDiscountCalculator),
-                        _buildButton('Payment', widget.onPayment),
+                        _buildButton(
+                            'Discount',
+                            isDiscountButtonEnabled
+                                ? _openOrderDiscountCalculator
+                                : null),
+                        _buildButton(
+                            'Payment', total > 0 ? widget.onPayment : null),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -348,7 +356,7 @@ class _OrderSummaryState extends State<OrderSummary> {
     );
   }
 
-  Widget _buildButton(String text, Function() onPressed) {
+  Widget _buildButton(String text, Function()? onPressed) {
     return Container(
       width: 110,
       height: 45,

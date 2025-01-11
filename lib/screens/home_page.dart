@@ -1,3 +1,7 @@
+import 'dart:developer';
+import 'dart:io';
+import 'package:digisala_pos/utils/printReceipt_service.dart';
+import 'package:digisala_pos/widgets/printerSelectionDialog.dart';
 import 'package:flutter/material.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
@@ -17,6 +21,10 @@ import 'package:digisala_pos/widgets/return_list.dart';
 import 'package:digisala_pos/widgets/sales_history_dialog.dart' as salesHistory;
 import 'package:digisala_pos/widgets/search_bar.dart' as custom;
 import 'package:digisala_pos/database/product_db_helper.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -70,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_checkoutList[existingProductIndex].quantity < product.quantity) {
           _checkoutList[existingProductIndex].quantity += 1;
         } else {
-          _showSnackBar(
+          _productaddshowSnackBar(
               'Cannot add more of ${product.name}, not enough stock.');
         }
       } else {
@@ -79,16 +87,27 @@ class _HomeScreenState extends State<HomeScreen> {
           product.quantity = 1;
           _checkoutList.add(product);
         } else {
-          _showSnackBar('Cannot add ${product.name}, not enough stock.');
+          _productaddshowSnackBar(
+              'Cannot add ${product.name}, not enough stock.');
         }
       }
     });
   }
 
-  void _showSnackBar(String message) {
+  void _productaddshowSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: Colors.red,
+        content: Text(message),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _dbStatusshowSnackBar(String message, bool color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: color ? Colors.green : Colors.red,
         content: Text(message),
         duration: Duration(seconds: 2),
       ),
@@ -165,7 +184,61 @@ class _HomeScreenState extends State<HomeScreen> {
     return subtotal - discount;
   }
 
-  void _handlePayment() {
+  Future<void> _generatePdf(Sales sales, int salesId,
+      List<Product> checkoutList, double paidAmount, double change) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Store Name: Your Store',
+                  style: pw.TextStyle(fontSize: 18)),
+              pw.Text('Address: 123 Main St',
+                  style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Date: ${sales.date}', style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Time: ${sales.time}', style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Sales No: $salesId', style: pw.TextStyle(fontSize: 14)),
+              pw.Divider(),
+              ...checkoutList.map((product) => pw.Text(
+                  '${product.name} x${product.quantity} - ${product.price * product.quantity} LKR')),
+              pw.Divider(),
+              pw.Text('Subtotal: ${sales.subtotal} LKR',
+                  style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Discount: ${sales.discount} LKR',
+                  style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Total: ${sales.total} LKR',
+                  style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Paid: $paidAmount LKR',
+                  style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Change: $change LKR', style: pw.TextStyle(fontSize: 14)),
+              pw.Text('Payment Method: ${sales.paymentMethod}',
+                  style: pw.TextStyle(fontSize: 14)),
+              pw.SizedBox(height: 20),
+              pw.Text('Thank you, come again!',
+                  style: pw.TextStyle(fontSize: 14)),
+            ],
+          );
+        },
+      ),
+    );
+
+    // Save the PDF to a file
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/receipt_$salesId.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    // Optionally, you can use the printing package to print the PDF
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+
+    print('PDF generated at ${file.path}');
+  }
+
+  void _handlePayment(String paymentMethod) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -183,19 +256,43 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.of(context).pop();
           },
           onPrintReceipt: () {
-            _createSalesRecord('Cash');
+            _createSalesRecord(paymentMethod);
             print('Print Receipt');
+            Future.delayed(const Duration(seconds: 2), () {
+              Navigator.of(context).pop();
+            });
           },
-          onPDF: () {
-            _createSalesRecord('Card');
+          // In your main widget
+          onPDF: (double paidAmount, double balance) async {
+            final result = await _createSalesRecord(paymentMethod);
+            final sales = result['sales'];
+            final salesId = result['salesId'];
+            final checkoutList = result[
+                'checkoutList']; // Access the checkout list from the result
+
+            if (salesId != null) {
+              await _generatePdf(sales, salesId, checkoutList, paidAmount,
+                  balance); // Use the checkoutList from the result
+            } else {
+              print('Sales ID is null');
+            }
             print('Generate PDF');
+            Future.delayed(const Duration(seconds: 2), () {
+              Navigator.of(context).pop();
+            });
+          },
+
+          initialIsCashSelected: paymentMethod == 'Cash',
+          onPaymentMethodChanged: (method) {
+            // Update the payment method based on user selection
+            paymentMethod = method;
           },
         );
       },
     );
   }
 
-  void _createSalesRecord(String paymentMethod) async {
+  Future<Map<String, dynamic>> _createSalesRecord(String paymentMethod) async {
     final sales = Sales(
       date: DateTime.now(),
       time: TimeOfDay.now().format(context),
@@ -235,40 +332,51 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _printReceipt(sales, salesId);
 
+    // Capture the current checkout list before clearing it
+    final currentCheckoutList = List<Product>.from(_checkoutList);
+
     setState(() {
       _checkoutList.clear();
       _discountManager.reset();
       _searchBarFocusNode.requestFocus();
       _currentSalesId++;
     });
+
+    return {
+      'sales': sales,
+      'salesId': salesId,
+      'checkoutList': currentCheckoutList, // Include the checkout list
+    };
   }
 
-  void _printReceipt(Sales sales, int salesId) {
-    print('Printing Receipt...');
-    print('Store Name: Your Store');
-    print('Address: 123 Main St');
-    print('Date: ${sales.date}');
-    print('Time: ${sales.time}');
-    print('Sales No: $salesId');
-    print('--------------------------------');
+  void _printReceipt(Sales sales, int salesId) async {
+    final buffer = StringBuffer();
+    buffer.writeln('Store Name: Your Store');
+    buffer.writeln('Address: 123 Main St');
+    buffer.writeln('Date: ${sales.date}');
+    buffer.writeln('Time: ${sales.time}');
+    buffer.writeln('Sales No: $salesId');
+    buffer.writeln('--------------------------------');
     for (var product in _checkoutList) {
-      print(
+      buffer.writeln(
           '${product.name} x${product.quantity} - ${product.price * product.quantity} LKR');
     }
-    print('--------------------------------');
-    print('Subtotal: ${sales.subtotal} LKR');
-    print('Discount: ${sales.discount} LKR');
-    print('Total: ${sales.total} LKR');
-    print('Payment Method: ${sales.paymentMethod}');
-    print('Thank you, come again!');
+    buffer.writeln('--------------------------------');
+    buffer.writeln('Subtotal: ${sales.subtotal} LKR');
+    buffer.writeln('Discount: ${sales.discount} LKR');
+    buffer.writeln('Total: ${sales.total} LKR');
+    buffer.writeln('Payment Method: ${sales.paymentMethod}');
+    buffer.writeln('Thank you, come again!');
+
+    await CustomPrinterService.printReceipt(buffer.toString());
   }
 
   void _handleCashPayment() {
-    print('Processing cash payment...');
+    _handlePayment('Cash');
   }
 
   void _handleCardPayment() {
-    print('Processing card payment...');
+    _handlePayment('Card');
   }
 
   void _showSalesHistory() {
@@ -361,6 +469,20 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _showPrinterSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return PrinterSelectionDialog(
+          onPrinterSelected: (printer) {
+            CustomPrinterService.setPrinter(printer);
+            log('Selected printer: ${printer.name}');
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -382,11 +504,70 @@ class _HomeScreenState extends State<HomeScreen> {
                   focusNode: _searchBarFocusNode, // Pass the focus node
                 ),
                 const Spacer(),
-                IconButton(
-                  onPressed: _loadProducts,
-                  icon: Icon(Icons.settings_applications_outlined),
-                  iconSize: 50,
-                  color: Colors.white,
+                PopupMenuButton<String>(
+                  color: const Color(0xFF2D2D2D),
+                  popUpAnimationStyle: AnimationStyle(
+                    // Add this line
+                    curve: Curves.easeInOut, // Add this line
+                    duration:
+                        const Duration(milliseconds: 200), // Add this line
+                  ),
+                  icon: Icon(Icons.settings_applications_outlined,
+                      size: 50, color: Colors.white),
+                  onSelected: (value) async {
+                    bool success;
+                    switch (value) {
+                      case 'Printer Settings':
+                        _showPrinterSelectionDialog();
+                        break;
+                      case 'Return Sales':
+                        _showReturnList();
+                        break;
+                      case 'Export Database':
+                        success =
+                            await DatabaseHelper.instance.exportDatabase();
+                        _dbStatusshowSnackBar(
+                            success
+                                ? 'Database exported successfully!'
+                                : 'Failed to export database.',
+                            success);
+                        break;
+                      case 'Import Database':
+                        success =
+                            await DatabaseHelper.instance.importDatabase();
+                        _dbStatusshowSnackBar(
+                            success
+                                ? 'Database imported successfully!'
+                                : 'Failed to import database.',
+                            success);
+                        break;
+                    }
+                  },
+                  itemBuilder: (BuildContext context) =>
+                      <PopupMenuEntry<String>>[
+                    const PopupMenuItem<String>(
+                      value: 'Printer Settings',
+                      child: Text(
+                        'Printer Settings',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Return Sales',
+                      child: Text('Return Sales',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Export Database',
+                      child: Text('Export Database',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Import Database',
+                      child: Text('Import Database',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -431,9 +612,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 70),
                   OrderSummary(
                     products: _checkoutList,
-                    onClose: _handleClose,
+                    onClose: _handleVoidOrder,
                     onDiscount: _showDiscountCalculator,
-                    onPayment: _handlePayment,
+                    onPayment: () => _handlePayment('Cash'),
                     onCashPayment: _handleCashPayment,
                     onCardPayment: _handleCardPayment,
                     discountManager: _discountManager,
@@ -446,8 +627,9 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(color: Color(0xFF2D2D2D), thickness: 1),
             Footer(
               onVoidOrder: _handleVoidOrder,
-              onPayment: _handlePayment,
+              onPayment: () => _handlePayment('Cash'),
               requestFocusNode: _searchBarFocusNode,
+              total: _calculateTotal(),
             ),
           ],
         ),

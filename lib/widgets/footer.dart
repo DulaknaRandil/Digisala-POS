@@ -11,8 +11,9 @@ class Footer extends StatefulWidget {
   final String userRole;
   final String? avatarUrl;
   final VoidCallback onVoidOrder;
-  final VoidCallback onPayment;
+  final Function onPayment;
   final FocusNode requestFocusNode;
+  final double total; // Add this line
 
   const Footer({
     Key? key,
@@ -21,6 +22,7 @@ class Footer extends StatefulWidget {
     required this.onVoidOrder,
     required this.onPayment,
     required this.requestFocusNode,
+    required this.total,
   }) : super(key: key);
 
   @override
@@ -40,7 +42,7 @@ class _FooterState extends State<Footer> {
     setState(() {
       products = _products;
     });
-    _fetchStockCounts(); // Call this after products are loaded
+    // _fetchStockCounts(); // Call this after products are loaded
   }
 
   @override
@@ -234,13 +236,14 @@ class _FooterState extends State<Footer> {
               ),
             ],
           ),
-          _buildActionButton('Payment', Colors.green, widget.onPayment),
+          _buildActionButton('Payment', Colors.green,
+              widget.total > 0 ? widget.onPayment : null),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton(String text, Color color, VoidCallback onPressed) {
+  Widget _buildActionButton(String text, Color color, onPressed) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(

@@ -395,8 +395,8 @@ class _ProductFormState extends State<ProductForm> {
             const SizedBox(width: 8),
             InkWell(
               onTap: _addGroup,
-              child: Image.network(
-                'https://dashboard.codeparrot.ai/api/assets/Z3rqw4H_EXkqg65T',
+              child: Image.asset(
+                'assets/add.png',
                 width: 38,
                 height: 38,
               ),

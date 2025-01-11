@@ -1,4 +1,5 @@
 import 'dart:io'; // Required for Platform checks
+import 'package:digisala_pos/utils/printReceipt_service.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -13,6 +14,7 @@ import 'screens/bill_screen.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
+  CustomPrinterService.init();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Check platform and initialize SQLite database factory

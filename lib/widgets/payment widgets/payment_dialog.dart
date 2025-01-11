@@ -6,15 +6,19 @@ class PaymentDialog extends StatefulWidget {
   final Function(double) onPaidAmountChanged;
   final VoidCallback onClose;
   final VoidCallback onPrintReceipt;
-  final VoidCallback onPDF;
+  final Function(double, double) onPDF;
+  final bool initialIsCashSelected;
+  final Function(String) onPaymentMethodChanged; // Add this line
 
   const PaymentDialog({
     Key? key,
-    this.total = 0, // Default value
+    this.total = 0,
     required this.onPaidAmountChanged,
     required this.onClose,
     required this.onPrintReceipt,
     required this.onPDF,
+    this.initialIsCashSelected = true,
+    required this.onPaymentMethodChanged, // Add this line
   }) : super(key: key);
 
   @override
@@ -22,13 +26,16 @@ class PaymentDialog extends StatefulWidget {
 }
 
 class _PaymentDialogState extends State<PaymentDialog> {
-  bool isCashSelected = true;
   double paidAmount = 0;
   final TextEditingController _paidController = TextEditingController();
+  bool showAnimation = false;
+  bool isPaymentSuccessful = true;
+  late bool isCashSelected;
 
   @override
   void initState() {
     super.initState();
+    isCashSelected = widget.initialIsCashSelected;
     _paidController.addListener(_updatePaidAmount);
   }
 
@@ -43,174 +50,222 @@ class _PaymentDialogState extends State<PaymentDialog> {
 
   double get balance => paidAmount - widget.total;
 
+  void _showPaymentAnimation(bool success) {
+    setState(() {
+      showAnimation = true;
+      isPaymentSuccessful = success;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      setState(() {
+        showAnimation = false;
+      });
+    });
+  }
+
+  void _togglePaymentMethod(bool isCash) {
+    setState(() {
+      isCashSelected = isCash;
+      widget.onPaymentMethodChanged(isCash ? 'Cash' : 'Card'); // Notify parent
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Dialog(
-        backgroundColor: const Color(0xFF121315),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-        child: Container(
-          width: 897,
-          height: 701,
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SingleChildScrollView(
+          child: Dialog(
+            backgroundColor: const Color(0xFF121315),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+            child: Container(
+              width: 897,
+              height: 701,
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 446,
-                    height: 36,
-                  ),
-                  IconButton(
-                    icon: Image.asset(
-                      'assets/cross_1.png',
-                      width: 36,
-                      height: 36,
-                    ),
-                    onPressed: widget.onClose,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-              Center(
-                child: Container(
-                  width: 307,
-                  height: 45,
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF434343),
-                    borderRadius: BorderRadius.circular(51),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  // Close button and header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => isCashSelected = true),
-                          child: Container(
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: isCashSelected
-                                  ? Colors.white
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(55),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Cash',
-                                style: TextStyle(
+                      const SizedBox(width: 446, height: 36),
+                      IconButton(
+                        icon: Image.asset(
+                          'assets/cross_1.png',
+                          width: 36,
+                          height: 36,
+                        ),
+                        onPressed: widget.onClose,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  // Payment method toggle
+                  Center(
+                    child: Container(
+                      width: 307,
+                      height: 45,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF434343),
+                        borderRadius: BorderRadius.circular(51),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _togglePaymentMethod(true),
+                              child: Container(
+                                height: 34,
+                                decoration: BoxDecoration(
                                   color: isCashSelected
-                                      ? const Color(0xFF313131)
-                                      : Colors.white,
-                                  fontSize: 18,
-                                  fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w700,
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(55),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Cash',
+                                    style: TextStyle(
+                                      color: isCashSelected
+                                          ? const Color(0xFF313131)
+                                          : Colors.white,
+                                      fontSize: 18,
+                                      fontFamily: 'Inter',
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => isCashSelected = false),
-                          child: Container(
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: !isCashSelected
-                                  ? Colors.white
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(55),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Card',
-                                style: TextStyle(
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _togglePaymentMethod(false),
+                              child: Container(
+                                height: 34,
+                                decoration: BoxDecoration(
                                   color: !isCashSelected
-                                      ? const Color(0xFF313131)
-                                      : Colors.white,
-                                  fontSize: 18,
-                                  fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w700,
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(55),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Card',
+                                    style: TextStyle(
+                                      color: !isCashSelected
+                                          ? const Color(0xFF313131)
+                                          : Colors.white,
+                                      fontSize: 18,
+                                      fontFamily: 'Inter',
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Amount details
+                  _buildAmountRow(
+                      'Total :', widget.total, const Color(0xFFF1F5F9)),
+                  if (isCashSelected) ...[
+                    const SizedBox(height: 30),
+                    _buildPaidAmountRow(),
+                    const SizedBox(height: 30),
+                    _buildAmountRow('Balance :', balance,
+                        balance >= 0 ? const Color(0xFFD3E955) : Colors.red),
+                  ],
+                  const Spacer(),
+                  // Footer buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      LogoComponent(
+                        width: 100,
+                        height: 80,
+                        logoUrl: 'assets/logo.png',
+                        backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: 200,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: TextButton(
+                          onPressed: () {
+                            widget.onPrintReceipt();
+                            _showPaymentAnimation(
+                                true); // Show success animation
+                          },
+                          child: const Text(
+                            'Print Receipt',
+                            style: TextStyle(
+                              color: Color(0xFF313131),
+                              fontSize: 24,
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 180),
+                      Container(
+                        width: 100,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: TextButton(
+                          onPressed: () {
+                            widget.onPDF(paidAmount, balance);
+                            _showPaymentAnimation(
+                                true); // Show success animation
+                          },
+                          child: const Text(
+                            'PDF',
+                            style: TextStyle(
+                              color: Color(0xFF313131),
+                              fontSize: 24,
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              const Spacer(),
-              _buildAmountRow('Total :', widget.total, const Color(0xFFF1F5F9)),
-              if (isCashSelected) ...[
-                const SizedBox(height: 30),
-                _buildPaidAmountRow(),
-                const SizedBox(height: 30),
-                _buildAmountRow('Balance :', balance,
-                    balance >= 0 ? const Color(0xFFD3E955) : Colors.red),
-              ],
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  LogoComponent(
-                    width: 100,
-                    height: 80,
-                    logoUrl: 'assets/logo.png',
-                    backgroundColor: Color.fromRGBO(2, 10, 27, 1),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 200,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: TextButton(
-                      onPressed: widget.onPrintReceipt,
-                      child: const Text(
-                        'Print Receipt',
-                        style: TextStyle(
-                          color: Color(0xFF313131),
-                          fontSize: 24,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 180),
-                  Container(
-                    width: 100,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: TextButton(
-                      onPressed: widget.onPDF,
-                      child: const Text(
-                        'PDF',
-                        style: TextStyle(
-                          color: Color(0xFF313131),
-                          fontSize: 24,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+        if (showAnimation)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black54,
+              child: Center(
+                child: Icon(
+                  isPaymentSuccessful ? Icons.check_circle : Icons.error,
+                  color: isPaymentSuccessful ? Colors.green : Colors.red,
+                  size: 100,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
