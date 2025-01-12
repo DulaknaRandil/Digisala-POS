@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'dart:io';
 import 'package:digisala_pos/utils/printReceipt_service.dart';
+import 'package:digisala_pos/widgets/access_control.dart';
 import 'package:digisala_pos/widgets/printerSelectionDialog.dart';
 import 'package:flutter/material.dart';
 import 'package:digisala_pos/models/product_model.dart';
@@ -469,6 +470,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+// Inside the HomeScreen class
+  void _showUserAccessControl() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return UserAccessControlDialog();
+      },
+    );
+  }
+
   void _showPrinterSelectionDialog() {
     showDialog(
       context: context,
@@ -605,7 +616,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onGroupPressed: _showGroupForm,
                         onUpdatePressed: _showProductUpdateForm,
                         onHistoryPressed: _showSalesHistory,
-                        onSecurityPressed: _showReturnList,
+                        onSecurityPressed: _showUserAccessControl,
                       ),
                     ],
                   ),

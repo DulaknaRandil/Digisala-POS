@@ -3,13 +3,11 @@ import 'package:flutter/services.dart';
 
 class PinEntryComponent extends StatefulWidget {
   final Function(String) onPinComplete;
-  final String correctPin;
   final bool showLogo;
 
   const PinEntryComponent({
     Key? key,
     required this.onPinComplete,
-    this.correctPin = '1234',
     this.showLogo = false,
   }) : super(key: key);
 
@@ -27,7 +25,7 @@ class _PinEntryComponentState extends State<PinEntryComponent> {
       setState(() {
         currentPin += number;
         if (currentPin.length == 4) {
-          _validatePin();
+          widget.onPinComplete(currentPin);
         }
       });
     }
@@ -45,24 +43,6 @@ class _PinEntryComponentState extends State<PinEntryComponent> {
     }
   }
 
-  void _validatePin() {
-    if (currentPin == widget.correctPin) {
-      widget.onPinComplete(currentPin);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PIN correct')),
-      );
-    } else {
-      setState(() {
-        headerText = 'Wrong PIN, try again';
-        isError = true;
-        currentPin = '';
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wrong PIN')),
-      );
-    }
-  }
-
   Widget _buildPinDot(bool isFilled) {
     return Container(
       width: 12,
@@ -70,7 +50,7 @@ class _PinEntryComponentState extends State<PinEntryComponent> {
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isFilled ? Colors.white : Colors.white.withValues(alpha: 0.3),
+        color: isFilled ? Colors.white : Colors.white.withOpacity(0.3),
       ),
     );
   }
@@ -195,6 +175,14 @@ class _PinEntryComponentState extends State<PinEntryComponent> {
                   ],
                 ),
               ],
+            ),
+            SizedBox(height: 70),
+            Text(
+              '© 2025 Digisala POS. All rights reserved',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white,
+              ),
             ),
           ],
         ),

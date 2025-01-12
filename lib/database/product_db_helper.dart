@@ -1,10 +1,11 @@
 import 'dart:io';
-
 import 'package:digisala_pos/models/group_model.dart';
+import 'package:digisala_pos/models/pos_id_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
 import 'package:digisala_pos/models/sales_model.dart';
 import 'package:digisala_pos/models/return_model.dart';
+import 'package:digisala_pos/models/user_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -93,6 +94,94 @@ class DatabaseHelper {
         FOREIGN KEY (salesItemId) REFERENCES sales_items (id)
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE pos_id(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pos_id TEXT NOT NULL,
+        status TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE user_table(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<int> updatePosIdStatus(int id, String status) async {
+    final db = await instance.database;
+    return await db.update(
+      'pos_id',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<PosId?> getActivePosId() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'pos_id',
+      where: 'status = ?',
+      whereArgs: ['active'],
+    );
+    if (maps.isNotEmpty) {
+      return PosId.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<int> insertPosId(PosId posId) async {
+    final db = await instance.database;
+    return await db.insert('pos_id', posId.toMap());
+  }
+
+  Future<PosId?> getPosId() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('pos_id');
+    if (maps.isNotEmpty) {
+      return PosId.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<int> insertUser(User user) async {
+    final db = await instance.database;
+    return await db.insert('user_table', user.toMap());
+  }
+
+  Future<User?> getUserByUsername(String username) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'user_table',
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+    if (maps.isNotEmpty) {
+      return User.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<List<User>> getAllUsers() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('user_table');
+    return List.generate(maps.length, (i) => User.fromMap(maps[i]));
+  }
+
+  Future<int> updateUser(User user) async {
+    final db = await instance.database;
+    return await db.update(
+      'user_table',
+      user.toMap(),
+      where: 'id = ?',
+      whereArgs: [user.id],
+    );
   }
 
   Future<int> insertProduct(Product product) async {
