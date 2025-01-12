@@ -14,8 +14,10 @@ import 'screens/bill_screen.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
-  CustomPrinterService.init();
+
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize the service
+  await ThermalPrinterService.initialize();
 
   // Check platform and initialize SQLite database factory
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {

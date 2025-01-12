@@ -330,6 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
       originalProduct.quantity -= product.quantity;
       await DatabaseHelper.instance.updateProduct(originalProduct);
     }
+    // _testPrint();
 
     _printReceipt(sales, salesId);
 
@@ -351,25 +352,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _printReceipt(Sales sales, int salesId) async {
-    final buffer = StringBuffer();
-    buffer.writeln('Store Name: Your Store');
-    buffer.writeln('Address: 123 Main St');
-    buffer.writeln('Date: ${sales.date}');
-    buffer.writeln('Time: ${sales.time}');
-    buffer.writeln('Sales No: $salesId');
-    buffer.writeln('--------------------------------');
-    for (var product in _checkoutList) {
-      buffer.writeln(
-          '${product.name} x${product.quantity} - ${product.price * product.quantity} LKR');
-    }
-    buffer.writeln('--------------------------------');
-    buffer.writeln('Subtotal: ${sales.subtotal} LKR');
-    buffer.writeln('Discount: ${sales.discount} LKR');
-    buffer.writeln('Total: ${sales.total} LKR');
-    buffer.writeln('Payment Method: ${sales.paymentMethod}');
-    buffer.writeln('Thank you, come again!');
+    try {
+      if (!ThermalPrinterService.isConnected) {
+        _showPrinterSelectionDialog();
+        return;
+      }
 
-    await CustomPrinterService.printReceipt(buffer.toString());
+      // Prepare items list
+      final items = _checkoutList
+          .map((product) => {
+                'name': product.name,
+                'quantity': product.quantity,
+                'price': product.price,
+              })
+          .toList();
+
+      await ThermalPrinterService.printReceipt(
+        storeName: 'Your Store',
+        address: '123 Main St',
+        date: sales.date.toString().split(' ')[0],
+        time: sales.time,
+        salesId: salesId.toString(),
+        items: items,
+        subtotal: sales.subtotal,
+        discount: sales.discount,
+        total: sales.total,
+        paymentMethod: sales.paymentMethod,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt printed successfully')),
+      );
+    } catch (e) {
+      debugPrint('Error printing receipt: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to print receipt: ${e.toString()}')),
+      );
+    }
   }
 
   void _handleCashPayment() {
@@ -486,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (BuildContext context) {
         return PrinterSelectionDialog(
           onPrinterSelected: (printer) {
-            CustomPrinterService.setPrinter(printer);
+            ThermalPrinterService.connectPrinter(printer);
             log('Selected printer: ${printer.name}');
           },
         );

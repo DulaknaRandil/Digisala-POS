@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:digisala_pos/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:digisala_pos/database/product_db_helper.dart';
@@ -16,6 +17,7 @@ class LoginScreen extends StatelessWidget {
 
     try {
       final posId = await dbHelper.getPosId();
+      final existingUser = await dbHelper.getUserByUsername(username);
 
       if (await _isConnected()) {
         if (posId == null) {
@@ -30,6 +32,15 @@ class LoginScreen extends StatelessWidget {
           if (loginResponse.statusCode == 200) {
             final loginData = jsonDecode(loginResponse.body);
             final posIdValue = loginData['pos_id'];
+
+            // If user doesn't exist locally and login successful, add as admin
+            if (existingUser == null) {
+              await dbHelper.insertUser(User(
+                role: 'Admin',
+                username: username,
+                password: pin,
+              ));
+            }
 
             await dbHelper.insertPosId(
                 PosId(posId: posIdValue.toString(), status: 'inactive'));
@@ -58,8 +69,21 @@ class LoginScreen extends StatelessWidget {
                 return;
               }
             }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Invalid credentials')),
+            );
+            return;
           }
         } else {
+          // Check if user exists in local database for online mode
+          if (existingUser == null || existingUser.password != pin) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Invalid username or password')),
+            );
+            return;
+          }
+
           print('Checking POS ID status online...');
           final statusResponse = await http.post(
             Uri.parse(
@@ -88,8 +112,7 @@ class LoginScreen extends StatelessWidget {
       } else {
         print('No internet connection, checking offline access...');
         if (posId != null && posId.status == 'active') {
-          final user = await dbHelper.getUserByUsername(username);
-          if (user != null && user.password == pin) {
+          if (existingUser != null && existingUser.password == pin) {
             print('User credentials valid, navigating to dashboard...');
             Navigator.pushReplacementNamed(context, '/dashboard');
           } else {

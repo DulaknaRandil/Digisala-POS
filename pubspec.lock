@@ -121,14 +121,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.1"
-  esc_pos_utils_plus:
-    dependency: transitive
-    description:
-      name: esc_pos_utils_plus
-      sha256: "2a22d281cb6f04600ba3ebd607ad8df03a4b2446d814007d22525bab4d50c2ff"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.4"
   fake_async:
     dependency: transitive
     description:
@@ -158,14 +150,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_blue_plus:
-    dependency: transitive
-    description:
-      name: flutter_blue_plus
-      sha256: d2ac9fac56c4b3b08eb68752380e2d45e64c61db629b70e61bb36c95cb65d431
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.34.5"
   flutter_esc_pos_utils:
     dependency: "direct main"
     description:
@@ -203,14 +187,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_thermal_printer:
-    dependency: "direct main"
-    description:
-      name: flutter_thermal_printer
-      sha256: "793fb2f7631759e4aec7781277b0b3d4e57abff5694e7b3b1fa26dff89c3f1e5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.1"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
@@ -512,14 +488,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.27.7"
-  screenshot:
-    dependency: transitive
-    description:
-      name: screenshot
-      sha256: "63817697a7835e6ce82add4228e15d233b74d42975c143ad8cfe07009fab866b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -677,14 +645,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.10.0"
-  win_ble:
-    dependency: transitive
-    description:
-      name: win_ble
-      sha256: "2a867e13c4b355b101fc2c6e2ac85eeebf965db34eca46856f8b478e93b41e96"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.1"
   xdg_directories:
     dependency: transitive
     description:
