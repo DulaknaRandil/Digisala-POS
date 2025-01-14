@@ -1,8 +1,8 @@
+import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'package:digisala_pos/models/user_model.dart';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:digisala_pos/models/user_model.dart';
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/models/pos_id_model.dart';
 import 'package:digisala_pos/widgets/logo_component.dart';
@@ -14,6 +14,20 @@ class LoginScreen extends StatelessWidget {
   Future<void> loginUser(
       BuildContext context, String username, String pin) async {
     final dbHelper = DatabaseHelper.instance;
+
+    // Show the circular progress indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: CircularProgressIndicator(
+            color: Color.fromRGBO(2, 10, 27, 1),
+            backgroundColor: Colors.white,
+          ),
+        );
+      },
+    );
 
     try {
       final posId = await dbHelper.getPosId();
@@ -33,7 +47,6 @@ class LoginScreen extends StatelessWidget {
             final loginData = jsonDecode(loginResponse.body);
             final posIdValue = loginData['pos_id'];
 
-            // If user doesn't exist locally and login successful, add as admin
             if (existingUser == null) {
               await dbHelper.insertUser(User(
                 role: 'Admin',
@@ -58,11 +71,13 @@ class LoginScreen extends StatelessWidget {
 
               if (statusData['status'] == 'active') {
                 await dbHelper.updatePosIdStatus(posIdValue, 'active');
+                Navigator.pop(context); // Hide the progress indicator
                 Navigator.pushReplacementNamed(context, '/dashboard');
                 return;
               } else {
                 print('POS ID not active');
                 await dbHelper.updatePosIdStatus(posIdValue, 'inactive');
+                Navigator.pop(context); // Hide the progress indicator
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Please contact the support team')),
                 );
@@ -70,14 +85,15 @@ class LoginScreen extends StatelessWidget {
               }
             }
           } else {
+            Navigator.pop(context); // Hide the progress indicator
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Invalid credentials')),
             );
             return;
           }
         } else {
-          // Check if user exists in local database for online mode
           if (existingUser == null || existingUser.password != pin) {
+            Navigator.pop(context); // Hide the progress indicator
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Invalid username or password')),
             );
@@ -98,10 +114,12 @@ class LoginScreen extends StatelessWidget {
 
             if (statusData['status'] == 'active') {
               await dbHelper.updatePosIdStatus(posId.id!, 'active');
+              Navigator.pop(context); // Hide the progress indicator
               Navigator.pushReplacementNamed(context, '/dashboard');
               return;
             } else {
               print('POS ID not active');
+              Navigator.pop(context); // Hide the progress indicator
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Please contact the support team')),
               );
@@ -114,15 +132,18 @@ class LoginScreen extends StatelessWidget {
         if (posId != null && posId.status == 'active') {
           if (existingUser != null && existingUser.password == pin) {
             print('User credentials valid, navigating to dashboard...');
+            Navigator.pop(context); // Hide the progress indicator
             Navigator.pushReplacementNamed(context, '/dashboard');
           } else {
             print('Invalid username or password');
+            Navigator.pop(context); // Hide the progress indicator
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Invalid username or password')),
             );
           }
         } else {
           print('POS ID not active');
+          Navigator.pop(context); // Hide the progress indicator
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Please contact the support team')),
           );
@@ -130,6 +151,7 @@ class LoginScreen extends StatelessWidget {
       }
     } catch (e) {
       print('Error during login: $e');
+      Navigator.pop(context); // Hide the progress indicator
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('An error occurred, please try again')),
       );
@@ -174,6 +196,10 @@ class LoginScreen extends StatelessWidget {
                       ),
                     ),
                     child: TextField(
+                      autofocus: true,
+                      keyboardType: TextInputType.name,
+                      autocorrect: true,
+                      enableSuggestions: true,
                       cursorColor: Colors.black54,
                       controller: _usernameController,
                       decoration: InputDecoration(

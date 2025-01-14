@@ -5,7 +5,7 @@ class PaymentDialog extends StatefulWidget {
   final double total;
   final Function(double) onPaidAmountChanged;
   final VoidCallback onClose;
-  final VoidCallback onPrintReceipt;
+  final Function onPrintReceipt;
   final Function(double, double) onPDF;
   final bool initialIsCashSelected;
   final Function(String) onPaymentMethodChanged; // Add this line
@@ -205,7 +205,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                         ),
                         child: TextButton(
                           onPressed: () {
-                            widget.onPrintReceipt();
+                            widget.onPrintReceipt(paidAmount, balance);
                             _showPaymentAnimation(
                                 true); // Show success animation
                           },

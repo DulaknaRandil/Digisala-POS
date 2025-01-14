@@ -1,8 +1,10 @@
 import 'dart:developer';
 import 'dart:io';
-import 'package:digisala_pos/utils/printReceipt_service.dart';
+import 'package:digisala_pos/utils/printer_service.dart';
+import 'package:digisala_pos/utils/receipt_pdf.dart';
 import 'package:digisala_pos/widgets/access_control.dart';
 import 'package:digisala_pos/widgets/printerSelectionDialog.dart';
+import 'package:digisala_pos/widgets/receipt_setup.dart';
 import 'package:flutter/material.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
@@ -38,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Product> _products = [];
   List<Product> _checkoutList = [];
   final DiscountManager _discountManager = DiscountManager();
+  final PrinterService _printerService = PrinterService();
   int _currentSalesId = 1;
   late FocusNode _searchBarFocusNode;
 
@@ -75,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _checkoutList.indexWhere((p) => p.id == product.id);
 
       if (existingProductIndex != -1) {
-        // Check if adding one more exceeds the available quantity
         if (_checkoutList[existingProductIndex].quantity < product.quantity) {
           _checkoutList[existingProductIndex].quantity += 1;
         } else {
@@ -83,7 +85,6 @@ class _HomeScreenState extends State<HomeScreen> {
               'Cannot add more of ${product.name}, not enough stock.');
         }
       } else {
-        // Check if there's at least one available in stock
         if (product.quantity > 0) {
           product.quantity = 1;
           _checkoutList.add(product);
@@ -152,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
               child: Text('Cancel', style: TextStyle(color: Colors.white)),
             ),
@@ -162,8 +163,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _checkoutList.clear();
                   _discountManager.reset();
                 });
-                Navigator.of(context).pop(); // Close the dialog
-                _searchBarFocusNode.requestFocus(); // Focus the search bar
+                Navigator.of(context).pop();
+                _searchBarFocusNode.requestFocus();
                 print('Order has been voided.');
               },
               child: Text('Confirm', style: TextStyle(color: Colors.white)),
@@ -226,12 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    // Save the PDF to a file
     final output = await getTemporaryDirectory();
     final file = File("${output.path}/receipt_$salesId.pdf");
     await file.writeAsBytes(await pdf.save());
 
-    // Optionally, you can use the printing package to print the PDF
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
     );
@@ -256,24 +255,23 @@ class _HomeScreenState extends State<HomeScreen> {
           onClose: () {
             Navigator.of(context).pop();
           },
-          onPrintReceipt: () {
-            _createSalesRecord(paymentMethod);
+          onPrintReceipt: (double paidAmount, double balance) async {
+            await _createSalesRecord(paymentMethod, paidAmount, balance);
             print('Print Receipt');
             Future.delayed(const Duration(seconds: 2), () {
               Navigator.of(context).pop();
             });
           },
-          // In your main widget
           onPDF: (double paidAmount, double balance) async {
-            final result = await _createSalesRecord(paymentMethod);
+            final result =
+                await _createSalesRecord(paymentMethod, balance, paidAmount);
             final sales = result['sales'];
             final salesId = result['salesId'];
-            final checkoutList = result[
-                'checkoutList']; // Access the checkout list from the result
+            final checkoutList = result['checkoutList'];
 
             if (salesId != null) {
-              await _generatePdf(sales, salesId, checkoutList, paidAmount,
-                  balance); // Use the checkoutList from the result
+              await _generatePdf(
+                  sales, salesId, checkoutList, paidAmount, balance);
             } else {
               print('Sales ID is null');
             }
@@ -282,10 +280,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.of(context).pop();
             });
           },
-
           initialIsCashSelected: paymentMethod == 'Cash',
           onPaymentMethodChanged: (method) {
-            // Update the payment method based on user selection
             paymentMethod = method;
           },
         );
@@ -293,7 +289,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<Map<String, dynamic>> _createSalesRecord(String paymentMethod) async {
+  Future<Map<String, dynamic>> _createSalesRecord(
+      String paymentMethod, double change, double paidamount) async {
     final sales = Sales(
       date: DateTime.now(),
       time: TimeOfDay.now().format(context),
@@ -330,11 +327,9 @@ class _HomeScreenState extends State<HomeScreen> {
       originalProduct.quantity -= product.quantity;
       await DatabaseHelper.instance.updateProduct(originalProduct);
     }
-    // _testPrint();
 
-    _printReceipt(sales, salesId);
+    _printReceipt(sales, salesId, paidamount, change, paymentMethod);
 
-    // Capture the current checkout list before clearing it
     final currentCheckoutList = List<Product>.from(_checkoutList);
 
     setState(() {
@@ -347,18 +342,21 @@ class _HomeScreenState extends State<HomeScreen> {
     return {
       'sales': sales,
       'salesId': salesId,
-      'checkoutList': currentCheckoutList, // Include the checkout list
+      'checkoutList': currentCheckoutList,
     };
   }
 
-  void _printReceipt(Sales sales, int salesId) async {
+  Future<void> _printReceipt(Sales sales, int salesId, double paidAmount,
+      double change, String paymentMethod) async {
     try {
-      if (!ThermalPrinterService.isConnected) {
-        _showPrinterSelectionDialog();
+      // Check if there's a selected printer
+      if (_printerService.selectedPrinter == null) {
+        _showSnackBar('Please select a printer first');
+        _showPrinterSettingsDialog();
         return;
       }
 
-      // Prepare items list
+      // Format items for printing
       final items = _checkoutList
           .map((product) => {
                 'name': product.name,
@@ -367,28 +365,55 @@ class _HomeScreenState extends State<HomeScreen> {
               })
           .toList();
 
-      await ThermalPrinterService.printReceipt(
-        storeName: 'Your Store',
-        address: '123 Main St',
-        date: sales.date.toString().split(' ')[0],
-        time: sales.time,
-        salesId: salesId.toString(),
-        items: items,
-        subtotal: sales.subtotal,
-        discount: sales.discount,
-        total: sales.total,
-        paymentMethod: sales.paymentMethod,
+      // Load receipt setup and generate receipt
+      final setupData = await _printerService.loadReceiptSetup();
+      if (setupData.isEmpty) {
+        _showSnackBar('Please configure receipt settings first');
+        // Show receipt setup dialog
+        await showDialog(
+          context: context,
+          builder: (context) => const ReceiptSetupDialog(),
+        );
+        return;
+      }
+
+      // Generate receipt bytes
+      final bytes = await _printerService.generateReceipt(
+        setupData,
+        items,
+        sales: sales,
+        salesId: salesId,
+        cashierName:
+            'Cashier', // You might want to pass the actual cashier name
+
+        paidAmount: paidAmount,
+        change: change,
+        paymentMethod: paymentMethod,
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Receipt printed successfully')),
+      if (bytes.isEmpty) {
+        _showSnackBar('Failed to generate receipt');
+        return;
+      }
+
+      // Print the receipt
+      await _printerService.printerPlugin.printData(
+        _printerService.selectedPrinter!,
+        bytes,
       );
+
+      _showSnackBar('Receipt printed successfully');
     } catch (e) {
       debugPrint('Error printing receipt: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to print receipt: ${e.toString()}')),
-      );
+      _showSnackBar('Failed to print receipt: ${e.toString()}');
     }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _handleCashPayment() {
@@ -444,6 +469,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void ThermalPrinterTestService(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => const ThermalPrinterDialog(),
+    );
+  }
+
   void _showNewProductForm() {
     showDialog(
       context: context,
@@ -489,7 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-// Inside the HomeScreen class
   void _showUserAccessControl() {
     showDialog(
       context: context,
@@ -499,16 +530,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showPrinterSelectionDialog() {
+  void _showPrinterSettingsDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return PrinterSelectionDialog(
-          onPrinterSelected: (printer) {
-            ThermalPrinterService.connectPrinter(printer);
-            log('Selected printer: ${printer.name}');
-          },
-        );
+        return PrinterSettingsDialog();
+      },
+    );
+  }
+
+  void _showReceiptSetupDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return ReceiptSetupDialog();
       },
     );
   }
@@ -531,16 +566,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 custom.SearchBar(
                   onAddProduct: _addProductToCheckout,
-                  focusNode: _searchBarFocusNode, // Pass the focus node
+                  focusNode: _searchBarFocusNode,
                 ),
                 const Spacer(),
                 PopupMenuButton<String>(
                   color: const Color(0xFF2D2D2D),
                   popUpAnimationStyle: AnimationStyle(
-                    // Add this line
-                    curve: Curves.easeInOut, // Add this line
-                    duration:
-                        const Duration(milliseconds: 200), // Add this line
+                    curve: Curves.easeInOut,
+                    duration: const Duration(milliseconds: 200),
                   ),
                   icon: Icon(Icons.settings_applications_outlined,
                       size: 50, color: Colors.white),
@@ -548,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     bool success;
                     switch (value) {
                       case 'Printer Settings':
-                        _showPrinterSelectionDialog();
+                        _showPrinterSettingsDialog();
                         break;
                       case 'Return Sales':
                         _showReturnList();
@@ -570,6 +603,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? 'Database imported successfully!'
                                 : 'Failed to import database.',
                             success);
+                        break;
+                      case 'Receipt Setup':
+                        _showReceiptSetupDialog();
+                        break;
+                      case 'Thermal Setup':
+                        ThermalPrinterTestService(context);
                         break;
                     }
                   },
@@ -595,6 +634,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     const PopupMenuItem<String>(
                       value: 'Import Database',
                       child: Text('Import Database',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Receipt Setup',
+                      child: Text('Receipt Setup',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Thermal Setup',
+                      child: Text('Thermal Setup',
                           style: TextStyle(color: Colors.white)),
                     ),
                   ],

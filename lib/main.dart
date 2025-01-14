@@ -1,5 +1,5 @@
 import 'dart:io'; // Required for Platform checks
-import 'package:digisala_pos/utils/printReceipt_service.dart';
+import 'package:digisala_pos/utils/printer_service.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -17,7 +17,6 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize the service
-  await ThermalPrinterService.initialize();
 
   // Check platform and initialize SQLite database factory
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {

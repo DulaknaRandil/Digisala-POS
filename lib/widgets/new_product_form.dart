@@ -175,42 +175,44 @@ class _ProductFormState extends State<ProductForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: 700,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: _backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Header(
-                title: 'New Products',
-                onClose: _handleClose,
-              ),
-              const SizedBox(height: 24),
-              _buildFormFields(),
-              const SizedBox(height: 32),
-              SaveButton(
-                onPressed: _handleSave,
-                width: double.infinity,
-                height: 48,
-                borderRadius: 8,
-                text: 'Save',
-                backgroundColor: _borderColor,
-                textStyle: const TextStyle(
-                  color: _backgroundColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+    return SingleChildScrollView(
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 700,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _backgroundColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Header(
+                  title: 'New Products',
+                  onClose: _handleClose,
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                _buildFormFields(),
+                const SizedBox(height: 32),
+                SaveButton(
+                  onPressed: _handleSave,
+                  width: double.infinity,
+                  height: 48,
+                  borderRadius: 8,
+                  text: 'Save',
+                  backgroundColor: _borderColor,
+                  textStyle: const TextStyle(
+                    color: _backgroundColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

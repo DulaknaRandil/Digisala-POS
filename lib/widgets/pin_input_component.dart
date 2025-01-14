@@ -7,7 +7,7 @@ class PinInputComponent extends StatefulWidget {
 
 class _PinInputComponentState extends State<PinInputComponent> {
   String pin = '';
-  final String correctPin = '1234';
+  final String correctPin = '';
 
   void _handleButtonClick(String value) {
     setState(() {
