@@ -1,3 +1,5 @@
+import 'package:digisala_pos/models/product_model.dart';
+
 class DiscountManager {
   bool isItemMode = false;
   Map<String, ItemDiscount> itemDiscounts = {};
@@ -17,7 +19,9 @@ class DiscountManager {
   }
 
   void removeItemDiscount(String productId) {
-    itemDiscounts.remove(productId);
+    if (itemDiscounts.containsKey(productId)) {
+      itemDiscounts[productId] = ItemDiscount(value: 0.0, isPercentage: false);
+    }
   }
 
   double calculateDiscount(Map<String, double> items) {
@@ -51,14 +55,14 @@ class DiscountManager {
     return totalDiscount;
   }
 
-  double calculateItemDiscount(
-      String productId, double itemPrice, double currentSubtotal) {
+  double calculateItemDiscount(String productId, double itemPrice,
+      double currentSubtotal, Product product) {
     if (currentSubtotal <= 0) {
       return 0.0;
     }
 
     if (isItemMode) {
-      final itemDiscount = itemDiscounts[productId];
+      final itemDiscount = _getItemDiscount(productId, product);
       if (itemDiscount == null) return 0.0;
 
       return itemDiscount.isPercentage
@@ -83,6 +87,27 @@ class DiscountManager {
   void toggleMode() {
     isItemMode = !isItemMode;
     reset();
+  }
+
+  // Helper method to get item-specific discount (manual override or Product discount)
+  ItemDiscount? _getItemDiscount(String productId, Product? product) {
+    if (itemDiscounts.containsKey(productId)) {
+      return itemDiscounts[productId];
+    }
+
+    if (product == null) return null;
+
+    // Parse discount from the product
+    if (product.discount.endsWith('%')) {
+      return ItemDiscount(
+          value: double.parse(product.discount.replaceAll('%', '')),
+          isPercentage: true);
+    } else if (product.discount.isNotEmpty) {
+      return ItemDiscount(
+          value: double.parse(product.discount), isPercentage: false);
+    }
+
+    return null;
   }
 }
 

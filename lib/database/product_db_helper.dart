@@ -39,10 +39,13 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         barcode TEXT NOT NULL,
         name TEXT NOT NULL,
+        secondaryName TEXT,
         expiryDate TEXT,
         productGroup TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
+        quantity REAL NOT NULL,
         price REAL NOT NULL,
+        buyingPrice REAL NOT NULL,
+        discount TEXT,
         createdDate TEXT NOT NULL,
         updatedDate TEXT NOT NULL,
         status TEXT NOT NULL
@@ -73,7 +76,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         salesId INTEGER NOT NULL,
         name TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        buyingPrice REAL NOT NULL,
         price REAL NOT NULL,
         discount REAL NOT NULL,
         total REAL NOT NULL,
@@ -90,7 +94,7 @@ class DatabaseHelper {
         discount REAL NOT NULL,
         total REAL NOT NULL,
         returnDate TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
+        quantity REAL NOT NULL,
         FOREIGN KEY (salesItemId) REFERENCES sales_items (id)
       )
     ''');
@@ -153,6 +157,51 @@ class DatabaseHelper {
   Future<int> insertUser(User user) async {
     final db = await instance.database;
     return await db.insert('user_table', user.toMap());
+  }
+
+  Future<int> deleteUser(int id) async {
+    try {
+      final db = await instance.database;
+
+      // Check if user exists before deletion
+      final List<Map<String, dynamic>> user = await db.query(
+        'user_table',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      if (user.isEmpty) {
+        print('User with ID $id not found');
+        return 0;
+      }
+
+      // Check if user is the last admin
+      if (user.first['role'] == 'admin') {
+        final List<Map<String, dynamic>> adminCount = await db.query(
+          'user_table',
+          where: 'role = ?',
+          whereArgs: ['admin'],
+        );
+
+        if (adminCount.length <= 1) {
+          print('Cannot delete the last admin user');
+          return -1;
+        }
+      }
+
+      // Proceed with deletion
+      final result = await db.delete(
+        'user_table',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      print('User deleted successfully: $result row(s) affected');
+      return result;
+    } catch (e) {
+      print('Error deleting user: $e');
+      return -1;
+    }
   }
 
   Future<User?> getUserByUsername(String username) async {
@@ -304,6 +353,7 @@ class DatabaseHelper {
         name: map['name'],
         quantity: map['totalQuantity'],
         price: 0.0,
+        buyingPrice: 0.0,
         discount: 0.0,
         total: 0.0,
         refund: false,
@@ -336,6 +386,7 @@ class DatabaseHelper {
         name: map['name'],
         quantity: map['totalQuantity'],
         price: 0.0,
+        buyingPrice: 0.0,
         discount: 0.0,
         total: 0.0,
         refund: false,

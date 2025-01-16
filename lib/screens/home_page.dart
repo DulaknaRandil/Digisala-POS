@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _updateProduct(Product product, int change) async {
+  void _updateProduct(Product product, double change) async {
     setState(() {
       product.quantity += change;
       if (product.quantity < 1) product.quantity = 1;
@@ -256,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.of(context).pop();
           },
           onPrintReceipt: (double paidAmount, double balance) async {
-            await _createSalesRecord(paymentMethod, paidAmount, balance);
+            await _createSalesRecord(paymentMethod, balance, paidAmount);
             print('Print Receipt');
             Future.delayed(const Duration(seconds: 2), () {
               Navigator.of(context).pop();
@@ -313,11 +313,9 @@ class _HomeScreenState extends State<HomeScreen> {
         name: product.name,
         quantity: product.quantity,
         price: product.price,
-        discount: _discountManager.calculateItemDiscount(
-          product.id.toString(),
-          product.price * product.quantity,
-          _calculateSubtotal(),
-        ),
+        buyingPrice: product.buyingPrice,
+        discount: _discountManager.calculateItemDiscount(product.id.toString(),
+            product.price * product.quantity, _calculateSubtotal(), product),
         total: product.price * product.quantity,
       );
 
@@ -663,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: ProductList(
                           products: _checkoutList,
-                          onQuantityChange: (String productId, int change) {
+                          onQuantityChange: (String productId, double change) {
                             final product = _checkoutList.firstWhere(
                                 (p) => p.id.toString() == productId);
                             _updateProduct(product, change);

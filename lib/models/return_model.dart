@@ -5,7 +5,7 @@ class Return {
   final double discount;
   final double total;
   final String returnDate;
-  final int quantity;
+  final double quantity;
 
   Return({
     this.id,

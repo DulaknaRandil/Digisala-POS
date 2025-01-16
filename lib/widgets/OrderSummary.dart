@@ -172,10 +172,7 @@ class _OrderSummaryState extends State<OrderSummary> {
       children: widget.products.map((product) {
         double itemTotal = product.price * product.quantity;
         double itemDiscount = widget.discountManager.calculateItemDiscount(
-          product.id.toString(),
-          itemTotal,
-          subtotal,
-        );
+            product.id.toString(), itemTotal, subtotal, product);
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),

@@ -3,7 +3,7 @@ import 'package:digisala_pos/models/product_model.dart';
 
 class ProductList extends StatelessWidget {
   final List<Product> products;
-  final Function(String, int) onQuantityChange;
+  final Function(String, double) onQuantityChange;
   final Function(String) onRemove;
   final FocusNode searchBarFocusNode;
 
@@ -127,7 +127,7 @@ class ProductList extends StatelessWidget {
                               border: InputBorder.none,
                             ),
                             onSubmitted: (value) {
-                              int? newQuantity = int.tryParse(value);
+                              double? newQuantity = double.tryParse(value);
                               if (newQuantity != null) {
                                 onQuantityChange(product.id.toString(),
                                     newQuantity - product.quantity);

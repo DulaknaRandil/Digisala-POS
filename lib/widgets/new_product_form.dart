@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
@@ -10,10 +11,13 @@ class ProductForm extends StatefulWidget {
   final Function(Map<String, dynamic>)? onSave;
   final VoidCallback? onClose;
   final String? initialName;
+  final String? intialSecondaryName;
   final String? initialBarcode;
   final String? initialGroup;
   final String? initialQuantity;
   final String? initialPrice;
+  final String? initialBuyingPrice;
+  final String? initialdiscount;
   final String? initialExpiry;
   final String? initialStatus;
   final FocusNode searchBarFocusNode;
@@ -23,10 +27,13 @@ class ProductForm extends StatefulWidget {
     this.onSave,
     this.onClose,
     this.initialName,
+    this.intialSecondaryName,
     this.initialBarcode,
     this.initialGroup,
     this.initialQuantity,
     this.initialPrice,
+    this.initialBuyingPrice,
+    this.initialdiscount,
     this.initialExpiry,
     this.initialStatus = 'Active',
     required this.searchBarFocusNode,
@@ -39,11 +46,15 @@ class ProductForm extends StatefulWidget {
 class _ProductFormState extends State<ProductForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _secondaryNameController;
+  late final TextEditingController _convertedNameController;
   late final TextEditingController _barcodeController;
   late final TextEditingController _groupController;
   late final TextEditingController _quantityController;
   late final TextEditingController _priceController;
+  late final TextEditingController _buyingPriceController;
   late final TextEditingController _expiryController;
+  late final TextEditingController _discountController;
   late String _status;
   List<Group> _groups = [];
 
@@ -57,10 +68,16 @@ class _ProductFormState extends State<ProductForm> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
+    _secondaryNameController =
+        TextEditingController(text: widget.intialSecondaryName);
+    _convertedNameController = TextEditingController();
     _barcodeController = TextEditingController(text: widget.initialBarcode);
     _groupController = TextEditingController(text: widget.initialGroup);
     _quantityController = TextEditingController(text: widget.initialQuantity);
     _priceController = TextEditingController(text: widget.initialPrice);
+    _buyingPriceController =
+        TextEditingController(text: widget.initialBuyingPrice);
+    _discountController = TextEditingController(text: widget.initialdiscount);
     _expiryController = TextEditingController(text: widget.initialExpiry);
     _status = widget.initialStatus ?? 'Active';
     _loadGroups();
@@ -71,6 +88,29 @@ class _ProductFormState extends State<ProductForm> {
     setState(() {
       _groups = groups;
     });
+  }
+
+  Future<void> _convertSecondaryName() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://easysinhalaunicode.com/api/convert'),
+        body: {'data': _secondaryNameController.text},
+      );
+
+      // Print the response body for debugging
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Treat the response as plain text
+        setState(() {
+          _convertedNameController.text = response.body;
+        });
+      } else {
+        _showMessage('Failed to convert name', isError: true);
+      }
+    } catch (e) {
+      _showMessage('Error converting name: ${e.toString()}', isError: true);
+    }
   }
 
   Future<void> _addGroup() async {
@@ -122,27 +162,39 @@ class _ProductFormState extends State<ProductForm> {
     if (!_formKey.currentState!.validate()) return;
 
     try {
+      await _convertSecondaryName();
+
       Map<String, Object?> productData = {
         'name': _nameController.text,
+        'secondaryName': _convertedNameController.text,
         'barcode': _barcodeController.text,
         'productGroup': _groupController.text,
-        'quantity': int.tryParse(_quantityController.text) ?? 0,
+        'quantity': double.tryParse(_quantityController.text) ?? 0,
         'price': double.tryParse(_priceController.text) ?? 0.0,
+        'buyingPrice': double.tryParse(_buyingPriceController.text) ?? 0.0,
         'expiryDate': _expiryController.text.isNotEmpty
             ? DateTime.parse(_expiryController.text).toIso8601String()
             : null,
+        'discount': _discountController.text.isNotEmpty
+            ? _discountController.text
+            : 0.0,
         'status': _status,
       };
 
       final product = Product(
         name: productData['name'] as String,
+        secondaryName: productData['secondaryName'] as String,
         barcode: productData['barcode'] as String,
         expiryDate: productData['expiryDate'] != null
             ? DateTime.parse(productData['expiryDate'] as String)
             : null,
         productGroup: productData['productGroup'] as String,
-        quantity: productData['quantity'] as int,
+        quantity: productData['quantity'] as double,
         price: productData['price'] as double,
+        buyingPrice: productData['buyingPrice'] as double,
+        discount: productData['discount'] != null
+            ? productData['discount'] as String
+            : "0",
         createdDate: DateTime.now(),
         updatedDate: DateTime.now(),
         status: productData['status'] as String,
@@ -197,18 +249,20 @@ class _ProductFormState extends State<ProductForm> {
                 ),
                 const SizedBox(height: 24),
                 _buildFormFields(),
-                const SizedBox(height: 32),
-                SaveButton(
-                  onPressed: _handleSave,
-                  width: double.infinity,
-                  height: 48,
-                  borderRadius: 8,
-                  text: 'Save',
-                  backgroundColor: _borderColor,
-                  textStyle: const TextStyle(
-                    color: _backgroundColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 10),
+                Center(
+                  child: SaveButton(
+                    onPressed: _handleSave,
+                    width: 300,
+                    height: 48,
+                    borderRadius: 8,
+                    text: 'Save',
+                    backgroundColor: _borderColor,
+                    textStyle: const TextStyle(
+                      color: _backgroundColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -231,7 +285,22 @@ class _ProductFormState extends State<ProductForm> {
           rightField: _buildFieldColumn(
             'Barcode',
             _barcodeController,
-            'Scan barcode',
+            'Enter Barcode here',
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildFormRow(
+          leftField: _buildFieldColumn(
+            'Secondary Name',
+            _secondaryNameController,
+            'Add secondary name here',
+            onChanged: (value) => _convertSecondaryName(),
+          ),
+          rightField: _buildFieldColumn(
+            'Converted Name',
+            _convertedNameController,
+            'Converted name will appear here',
+            readOnly: true,
           ),
         ),
         const SizedBox(height: 24),
@@ -248,9 +317,30 @@ class _ProductFormState extends State<ProductForm> {
         const SizedBox(height: 24),
         _buildFormRow(
           leftField: _buildFieldColumn(
-            'Price',
+            'Buying Price',
+            _buyingPriceController,
+            'Enter buying price',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
+          ),
+          rightField: _buildFieldColumn(
+            'Selling Price',
             _priceController,
-            'Enter price',
+            'Enter selling price',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildFormRow(
+          leftField: _buildFieldColumn(
+            'Discount',
+            _discountController,
+            'Enter discount',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
@@ -265,7 +355,13 @@ class _ProductFormState extends State<ProductForm> {
           ),
         ),
         const SizedBox(height: 24),
-        _buildStatusField(),
+        Center(
+          child: SizedBox(
+            width: 500,
+            child: _buildStatusField(),
+          ),
+        ),
+        const SizedBox(height: 32),
       ],
     );
   }
@@ -291,6 +387,7 @@ class _ProductFormState extends State<ProductForm> {
     List<TextInputFormatter>? inputFormatters,
     bool readOnly = false,
     VoidCallback? onTap,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,6 +400,7 @@ class _ProductFormState extends State<ProductForm> {
           inputFormatters: inputFormatters,
           readOnly: readOnly,
           onTap: onTap,
+          onChanged: onChanged,
         ),
       ],
     );
@@ -323,7 +421,7 @@ class _ProductFormState extends State<ProductForm> {
                 child: Autocomplete<Group>(
                   optionsBuilder: (TextEditingValue textEditingValue) {
                     if (textEditingValue.text.isEmpty) {
-                      return _groups; // Show all groups when input is empty
+                      return _groups;
                     }
                     return _groups.where((Group group) {
                       return group.name
@@ -447,6 +545,7 @@ class _ProductFormState extends State<ProductForm> {
     List<TextInputFormatter>? inputFormatters,
     bool readOnly = false,
     VoidCallback? onTap,
+    ValueChanged<String>? onChanged,
     Widget? suffixIcon,
   }) {
     return Container(
@@ -465,6 +564,7 @@ class _ProductFormState extends State<ProductForm> {
           inputFormatters: inputFormatters,
           readOnly: readOnly,
           onTap: onTap,
+          onChanged: onChanged,
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: _textColor,
@@ -566,11 +666,15 @@ class _ProductFormState extends State<ProductForm> {
   @override
   void dispose() {
     _nameController.dispose();
+    _secondaryNameController.dispose();
+    _convertedNameController.dispose();
     _barcodeController.dispose();
     _groupController.dispose();
     _quantityController.dispose();
     _priceController.dispose();
+    _buyingPriceController.dispose();
     _expiryController.dispose();
+    _discountController.dispose();
     super.dispose();
   }
 }

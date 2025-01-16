@@ -14,10 +14,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final _barcodeController = TextEditingController();
   final _nameController = TextEditingController();
+  final _secondaryNameController = TextEditingController();
   final _expiryController = TextEditingController();
   final _productGroupController = TextEditingController();
   final _quantityController = TextEditingController();
   final _priceController = TextEditingController();
+  final _buyingPriceController = TextEditingController();
+  final _discountController = TextEditingController();
 
   String _status = 'Active'; // Default value for status
   bool _isSaving = false; // For showing a loading indicator
@@ -47,10 +50,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
         final product = Product(
           barcode: _barcodeController.text,
           name: _nameController.text,
+          secondaryName: _secondaryNameController.text,
           expiryDate: DateTime.parse(_expiryController.text),
           productGroup: _productGroupController.text,
-          quantity: int.parse(_quantityController.text),
+          quantity: double.parse(_quantityController.text),
           price: double.parse(_priceController.text),
+          buyingPrice: double.parse(_buyingPriceController.text),
+          discount: _discountController.text,
           createdDate: DateTime.now(),
           updatedDate: DateTime.now(),
           status: _status,

@@ -19,10 +19,13 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   List<TextEditingController> _nameControllers = [];
+  List<TextEditingController> _secondaryNameControllers = [];
   List<TextEditingController> _barcodeControllers = [];
   List<TextEditingController> _quantityControllers = [];
   List<TextEditingController> _priceControllers = [];
+  List<TextEditingController> _buyingPriceControllers = [];
   List<TextEditingController> _expiryControllers = [];
+  List<TextEditingController> _discountControllers = [];
   List<String> _statusOptions = ['Active', 'Inactive'];
   List<String> _selectedStatus = [];
   List<Group> _groups = [];
@@ -40,28 +43,41 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
     final products = await DatabaseHelper.instance.getAllProducts();
     setState(() {
       _products = products;
-      _filteredProducts = products;
-      _nameControllers =
-          products.map((p) => TextEditingController(text: p.name)).toList();
-      _barcodeControllers =
-          products.map((p) => TextEditingController(text: p.barcode)).toList();
-      _quantityControllers = products
-          .map((p) => TextEditingController(text: p.quantity.toString()))
-          .toList();
-      _priceControllers = products
-          .map((p) => TextEditingController(text: p.price.toString()))
-          .toList();
-      _expiryControllers = products
-          .map((p) => TextEditingController(
-              text: p.expiryDate != null
-                  ? DateFormat('yyyy-MM-dd').format(p.expiryDate!)
-                  : ''))
-          .toList();
-      _selectedStatus = products.map((p) => p.status).toList();
-      _groupControllers = products
-          .map((p) => TextEditingController(text: p.productGroup))
-          .toList();
+      _initializeControllers(products);
+      _filterProducts();
     });
+  }
+
+  void _initializeControllers(List<Product> products) {
+    _nameControllers =
+        products.map((p) => TextEditingController(text: p.name)).toList();
+    _secondaryNameControllers = products
+        .map((p) => TextEditingController(text: p.secondaryName ?? ''))
+        .toList();
+    _barcodeControllers =
+        products.map((p) => TextEditingController(text: p.barcode)).toList();
+    _quantityControllers = products
+        .map((p) => TextEditingController(text: p.quantity.toString()))
+        .toList();
+    _priceControllers = products
+        .map((p) => TextEditingController(text: p.price.toString()))
+        .toList();
+    _buyingPriceControllers = products
+        .map((p) => TextEditingController(text: p.buyingPrice.toString()))
+        .toList();
+    _expiryControllers = products
+        .map((p) => TextEditingController(
+            text: p.expiryDate != null
+                ? DateFormat('yyyy-MM-dd').format(p.expiryDate!)
+                : ''))
+        .toList();
+    _discountControllers = products
+        .map((p) => TextEditingController(text: p.discount?.toString() ?? ''))
+        .toList();
+    _selectedStatus = products.map((p) => p.status).toList();
+    _groupControllers = products
+        .map((p) => TextEditingController(text: p.productGroup))
+        .toList();
   }
 
   Future<void> _loadGroups() async {
@@ -80,6 +96,7 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
         final barcodeMatches = product.barcode.toLowerCase().contains(query);
         return nameMatches || idMatches || barcodeMatches;
       }).toList();
+      _initializeControllers(_filteredProducts);
     });
   }
 
@@ -113,11 +130,14 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
               final updatedProduct = Product(
                 id: _filteredProducts[i].id,
                 name: _nameControllers[i].text,
+                secondaryName: _secondaryNameControllers[i].text,
                 barcode: _barcodeControllers[i].text,
                 expiryDate: DateTime.tryParse(_expiryControllers[i].text),
                 productGroup: _groupControllers[i].text,
-                quantity: int.parse(_quantityControllers[i].text),
+                quantity: double.parse(_quantityControllers[i].text),
                 price: double.parse(_priceControllers[i].text),
+                buyingPrice: double.parse(_buyingPriceControllers[i].text),
+                discount: (_discountControllers[i].text),
                 createdDate: _filteredProducts[i].createdDate,
                 updatedDate: DateTime.now(),
                 status: _selectedStatus[i],
@@ -126,7 +146,7 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
             }
             _showSnackBar('Products updated successfully!', Colors.green);
             Navigator.of(context).pop();
-            widget.searchBarFocusNode.requestFocus(); // Focus the search bar
+            widget.searchBarFocusNode.requestFocus();
           },
         );
       },
@@ -145,7 +165,6 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 600;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -235,6 +254,9 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                           label: Text('Name',
                               style: TextStyle(color: Colors.white))),
                       DataColumn(
+                          label: Text('Secondary Name',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
                           label: Text('Expiry Date',
                               style: TextStyle(color: Colors.white))),
                       DataColumn(
@@ -244,7 +266,13 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                           label: Text('Quantity',
                               style: TextStyle(color: Colors.white))),
                       DataColumn(
-                          label: Text('Price',
+                          label: Text('Buying Price',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Selling Price',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Discount',
                               style: TextStyle(color: Colors.white))),
                       DataColumn(
                           label: Text('Status',
@@ -277,6 +305,14 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                           ),
                           DataCell(
                             TextFormField(
+                              controller: _secondaryNameControllers[index],
+                              style: const TextStyle(color: Colors.white),
+                              decoration: const InputDecoration(
+                                  border: InputBorder.none),
+                            ),
+                          ),
+                          DataCell(
+                            TextFormField(
                               controller: _expiryControllers[index],
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
@@ -300,7 +336,7 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                           ),
                           DataCell(
                             Container(
-                              width: 150, // Adjust width as needed
+                              width: 150,
                               child: RawAutocomplete<Group>(
                                 textEditingController: _groupControllers[index],
                                 focusNode: FocusNode(),
@@ -329,7 +365,7 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                                     child: Material(
                                       elevation: 4.0,
                                       child: Container(
-                                        width: 200, // Adjust width as needed
+                                        width: 200,
                                         color: const Color(0xFF020A1B),
                                         child: ListView.builder(
                                           padding: EdgeInsets.zero,
@@ -340,11 +376,9 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                                             final Group option =
                                                 options.elementAt(index);
                                             return ListTile(
-                                              title: Text(
-                                                option.name,
-                                                style: const TextStyle(
-                                                    color: Colors.white),
-                                              ),
+                                              title: Text(option.name,
+                                                  style: const TextStyle(
+                                                      color: Colors.white)),
                                               onTap: () {
                                                 onSelected(option);
                                               },
@@ -386,10 +420,29 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                           ),
                           DataCell(
                             TextFormField(
+                              controller: _buyingPriceControllers[index],
+                              style: const TextStyle(color: Colors.white),
+                              decoration: const InputDecoration(
+                                  border: InputBorder.none),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          DataCell(
+                            TextFormField(
                               controller: _priceControllers[index],
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
                                   border: InputBorder.none),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          DataCell(
+                            TextFormField(
+                              controller: _discountControllers[index],
+                              style: const TextStyle(color: Colors.white),
+                              decoration: const InputDecoration(
+                                  border: InputBorder.none),
+                              keyboardType: TextInputType.number,
                             ),
                           ),
                           DataCell(
@@ -460,6 +513,9 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
       controller.dispose();
     }
     for (final controller in _groupControllers) {
+      controller.dispose();
+    }
+    for (final controller in _discountControllers) {
       controller.dispose();
     }
     super.dispose();

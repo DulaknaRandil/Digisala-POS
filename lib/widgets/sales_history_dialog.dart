@@ -21,7 +21,7 @@ class SalesHistoryDialog extends StatefulWidget {
 class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
   List<Sales> _salesList = [];
   List<SalesItem> _salesItems = [];
-  Map<int, int> _refundedQuantities = {};
+  Map<int, double> _refundedQuantities = {};
   String _searchQuery = '';
   DateTimeRange? _selectedDateRange;
   int _salesCount = 0;
@@ -85,7 +85,7 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
     }
   }
 
-  void _handleRefund(SalesItem item, int refundQuantity) async {
+  void _handleRefund(SalesItem item, double refundQuantity) async {
     if (refundQuantity > 0 && refundQuantity <= item.quantity) {
       final returnItem = Return(
         salesItemId: item.id!,
@@ -517,7 +517,7 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                                   ),
                                   onSubmitted: (value) {
                                     final refundQuantity =
-                                        int.tryParse(value) ?? 0;
+                                        double.tryParse(value) ?? 0;
                                     _handleRefund(item, refundQuantity);
                                   },
                                 ),

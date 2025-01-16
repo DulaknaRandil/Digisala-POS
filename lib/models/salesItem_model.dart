@@ -2,8 +2,9 @@ class SalesItem {
   final int? id;
   final int salesId;
   final String name;
-  final int quantity;
+  final double quantity;
   final double price;
+  final double buyingPrice;
   final double discount;
   final double total;
   late final bool refund;
@@ -14,6 +15,7 @@ class SalesItem {
     required this.name,
     required this.quantity,
     required this.price,
+    required this.buyingPrice,
     required this.discount,
     required this.total,
     this.refund = false,
@@ -26,6 +28,7 @@ class SalesItem {
       'name': name,
       'quantity': quantity,
       'price': price,
+      'buyingPrice': buyingPrice,
       'discount': discount,
       'total': total,
       'refund': refund ? 1 : 0,
@@ -39,6 +42,7 @@ class SalesItem {
       name: map['name'],
       quantity: map['quantity'],
       price: map['price'],
+      buyingPrice: map['buyingPrice'],
       discount: map['discount'],
       total: map['total'],
       refund: map['refund'] == 1,
