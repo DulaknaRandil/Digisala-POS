@@ -1,3 +1,4 @@
+import 'package:digisala_pos/screens/home_page.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -72,7 +73,15 @@ class LoginScreen extends StatelessWidget {
               if (statusData['status'] == 'active') {
                 await dbHelper.updatePosIdStatus(posIdValue, 'active');
                 Navigator.pop(context); // Hide the progress indicator
-                Navigator.pushReplacementNamed(context, '/dashboard');
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HomeScreen(
+                      userRole: existingUser?.role ?? 'Cashier',
+                      username: username,
+                    ),
+                  ),
+                );
                 return;
               } else {
                 print('POS ID not active');
@@ -115,7 +124,15 @@ class LoginScreen extends StatelessWidget {
             if (statusData['status'] == 'active') {
               await dbHelper.updatePosIdStatus(posId.id!, 'active');
               Navigator.pop(context); // Hide the progress indicator
-              Navigator.pushReplacementNamed(context, '/dashboard');
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    userRole: existingUser.role,
+                    username: username,
+                  ),
+                ),
+              );
               return;
             } else {
               print('POS ID not active');
@@ -133,7 +150,15 @@ class LoginScreen extends StatelessWidget {
           if (existingUser != null && existingUser.password == pin) {
             print('User credentials valid, navigating to dashboard...');
             Navigator.pop(context); // Hide the progress indicator
-            Navigator.pushReplacementNamed(context, '/dashboard');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  userRole: existingUser.role,
+                  username: username,
+                ),
+              ),
+            );
           } else {
             print('Invalid username or password');
             Navigator.pop(context); // Hide the progress indicator

@@ -9,15 +9,17 @@ import 'package:digisala_pos/widgets/stock_dialog.dart';
 
 class Footer extends StatefulWidget {
   final String userRole;
+  final String username; // Add username parameter
   final String? avatarUrl;
   final VoidCallback onVoidOrder;
   final Function onPayment;
   final FocusNode requestFocusNode;
-  final double total; // Add this line
+  final double total;
 
   const Footer({
     Key? key,
-    this.userRole = 'Admin',
+    required this.userRole,
+    required this.username, // Make username required
     this.avatarUrl = 'assets/user.png',
     required this.onVoidOrder,
     required this.onPayment,
@@ -207,7 +209,7 @@ class _FooterState extends State<Footer> {
                 ),
               ),
               Text(
-                widget.userRole,
+                '${widget.username}(${widget.userRole})', // Updated format
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 22,

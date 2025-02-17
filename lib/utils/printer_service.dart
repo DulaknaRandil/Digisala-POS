@@ -40,6 +40,11 @@ class PrinterService {
     }
   }
 
+  List<int> getDrawerCommand() {
+    // ESC/POS command for cash drawer: ESC p 0 25 250
+    return [27, 112, 0, 25, 250];
+  }
+
   Future<void> saveSelectedPrinter(Printer printer) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selectedPrinter', printer.name ?? '');
@@ -62,6 +67,7 @@ class PrinterService {
       );
       bytes += generator.feed(2);
       bytes += generator.text('Print Test Successful!');
+      bytes += getDrawerCommand();
       bytes += generator.feed(1);
       bytes += generator.cut();
 
@@ -271,10 +277,10 @@ class PrinterService {
 
       // Additional Footer Text
       bytes += generator.text(
-        'Software By Digisala - 0702901582',
+        'Software By Digisala - 078 74 51 715',
         styles: const PosStyles(align: PosAlign.center),
       );
-
+      bytes += getDrawerCommand();
       bytes += generator.feed(3);
       bytes += generator.cut();
 
@@ -371,6 +377,7 @@ class PrinterService {
       bytes += generator.feed(2);
       bytes += generator.text('Setup Print Complete',
           styles: const PosStyles(align: PosAlign.center));
+      bytes += getDrawerCommand();
       bytes += generator.feed(3);
       bytes += generator.cut();
 

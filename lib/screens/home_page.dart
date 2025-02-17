@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 import 'package:digisala_pos/utils/printer_service.dart';
@@ -33,7 +34,13 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final String userRole;
+  final String username;
+  const HomeScreen({
+    Key? key,
+    required this.userRole,
+    required this.username,
+  }) : super(key: key);
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -202,37 +209,114 @@ class _HomeScreenState extends State<HomeScreen> {
       List<Product> checkoutList, double paidAmount, double change) async {
     final pdf = pw.Document();
 
+    // Load receipt setup data
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/receipt_setup.json');
+
+    if (!await file.exists()) {
+      print('Receipt setup file not found');
+      return;
+    }
+
+    final String jsonString = await file.readAsString();
+    final Map<String, dynamic> setupData = json.decode(jsonString);
+
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('Store Name: Your Store',
-                  style: pw.TextStyle(fontSize: 18)),
-              pw.Text('Address: 123 Main St',
-                  style: pw.TextStyle(fontSize: 14)),
+              // Header
+              if (setupData['storeName'] != null)
+                pw.Text(setupData['storeName'],
+                    style: pw.TextStyle(fontSize: 18)),
+              if (setupData['address'] != null)
+                pw.Text(setupData['address'],
+                    style: pw.TextStyle(fontSize: 14)),
+              if (setupData['phone'] != null)
+                pw.Text(setupData['phone'], style: pw.TextStyle(fontSize: 14)),
+              if (setupData['email'] != null)
+                pw.Text(setupData['email'], style: pw.TextStyle(fontSize: 14)),
+
+              // Transaction Info
               pw.Text('Date: ${sales.date}', style: pw.TextStyle(fontSize: 14)),
               pw.Text('Time: ${sales.time}', style: pw.TextStyle(fontSize: 14)),
               pw.Text('Sales No: $salesId', style: pw.TextStyle(fontSize: 14)),
+
               pw.Divider(),
-              ...checkoutList.map((product) => pw.Text(
-                  '${product.name} x${product.quantity} - ${product.price * product.quantity} LKR')),
+
+              // Items
+              ...checkoutList.map((product) => pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(product.name),
+                      ),
+                      pw.Expanded(
+                        flex: 1,
+                        child: pw.Text('x${product.quantity}',
+                            textAlign: pw.TextAlign.right),
+                      ),
+                      pw.Expanded(
+                        flex: 1,
+                        child: pw.Text(
+                            '${product.price * product.quantity} ${setupData['currency'] ?? 'LKR'}',
+                            textAlign: pw.TextAlign.right),
+                      ),
+                    ],
+                  )),
+
               pw.Divider(),
-              pw.Text('Subtotal: ${sales.subtotal} LKR',
-                  style: pw.TextStyle(fontSize: 14)),
-              pw.Text('Discount: ${sales.discount} LKR',
-                  style: pw.TextStyle(fontSize: 14)),
-              pw.Text('Total: ${sales.total} LKR',
-                  style: pw.TextStyle(fontSize: 14)),
-              pw.Text('Paid: $paidAmount LKR',
-                  style: pw.TextStyle(fontSize: 14)),
-              pw.Text('Change: $change LKR', style: pw.TextStyle(fontSize: 14)),
-              pw.Text('Payment Method: ${sales.paymentMethod}',
-                  style: pw.TextStyle(fontSize: 14)),
+
+              // Totals
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Subtotal:'),
+                  pw.Text(
+                      '${sales.subtotal} ${setupData['currency'] ?? 'LKR'}'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Discount:'),
+                  pw.Text(
+                      '${sales.discount} ${setupData['currency'] ?? 'LKR'}'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:'),
+                  pw.Text('${sales.total} ${setupData['currency'] ?? 'LKR'}'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Paid:'),
+                  pw.Text('$paidAmount ${setupData['currency'] ?? 'LKR'}'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Change:'),
+                  pw.Text('$change ${setupData['currency'] ?? 'LKR'}'),
+                ],
+              ),
+              pw.Text('Payment Method: ${sales.paymentMethod}'),
+
               pw.SizedBox(height: 20),
-              pw.Text('Thank you, come again!',
-                  style: pw.TextStyle(fontSize: 14)),
+
+              // Footer
+              if (setupData['footerText'] != null)
+                pw.Text(setupData['footerText'],
+                    style: pw.TextStyle(fontSize: 14),
+                    textAlign: pw.TextAlign.center),
             ],
           );
         },
@@ -240,14 +324,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     final output = await getTemporaryDirectory();
-    final file = File("${output.path}/receipt_$salesId.pdf");
-    await file.writeAsBytes(await pdf.save());
+    final outputFile = File("${output.path}/receipt_$salesId.pdf");
+    await outputFile.writeAsBytes(await pdf.save());
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
     );
 
-    print('PDF generated at ${file.path}');
+    print('PDF generated at ${outputFile.path}');
   }
 
   void _handlePayment(String paymentMethod) {
@@ -401,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
         sales: sales,
         salesId: salesId,
         cashierName:
-            'Cashier', // You might want to pass the actual cashier name
+            widget.username, // You might want to pass the actual cashier name
 
         paidAmount: paidAmount,
         change: change,
@@ -623,6 +707,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       case 'Return Sales':
                         _showReturnList();
                         break;
+                      case 'Item Return':
+                        _showSalesHistory();
+                        break;
                     }
                   },
                   itemBuilder: (BuildContext context) =>
@@ -630,6 +717,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     const PopupMenuItem<String>(
                       value: 'Return Sales',
                       child: Text('Return Sales',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Item Return',
+                      child: Text('Item Return',
                           style: TextStyle(color: Colors.white)),
                     ),
                   ],
@@ -672,15 +764,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       SizedBox(
                         height: 15,
                       ),
-                      ActionButtons(
-                        onNewPressed: _showNewProductForm,
-                        onGroupPressed: _showGroupForm,
-                        onUpdatePressed: _showProductUpdateForm,
-                        onHistoryPressed: _showSalesHistory,
-                        onSecurityPressed: _showUserAccessControl,
-                        onGRNPressed: _showGRNDialog,
-                        onSuppliersPressed: _showSupplierDialog,
-                      ),
+                      if (widget.userRole.toLowerCase() == 'admin')
+                        ActionButtons(
+                          onNewPressed: _showNewProductForm,
+                          onGroupPressed: _showGroupForm,
+                          onUpdatePressed: _showProductUpdateForm,
+                          onHistoryPressed: _showSalesHistory,
+                          onSecurityPressed: _showUserAccessControl,
+                          onGRNPressed: _showGRNDialog,
+                          onSuppliersPressed: _showSupplierDialog,
+                        ),
                     ],
                   ),
                   const SizedBox(width: 70),
@@ -700,6 +793,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
             const Divider(color: Color(0xFF2D2D2D), thickness: 1),
             Footer(
+              username: widget.username,
+              userRole: widget.userRole,
               onVoidOrder: _handleVoidOrder,
               onPayment: () => _handlePayment('Cash'),
               requestFocusNode: _searchBarFocusNode,

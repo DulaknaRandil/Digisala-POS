@@ -48,7 +48,10 @@ class POSApp extends StatelessWidget {
         '/add-product': (context) => const AddProductScreen(),
         '/selling': (context) => const SellingScreen(),
         '/bill': (context) => const BillScreen(),
-        '/dashboard': (context) => const HomeScreen(),
+        '/dashboard': (context) => const HomeScreen(
+              userRole: '',
+              username: '',
+            ),
       },
     );
   }
