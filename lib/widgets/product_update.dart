@@ -1,6 +1,7 @@
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/models/suppplier_model.dart';
 import 'package:digisala_pos/widgets/product_update_confirmation_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -26,24 +27,31 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
   List<TextEditingController> _buyingPriceControllers = [];
   List<TextEditingController> _expiryControllers = [];
   List<TextEditingController> _discountControllers = [];
+  List<TextEditingController> _supplierControllers = []; // Supplier controllers
   List<String> _statusOptions = ['Active', 'Inactive'];
   List<String> _selectedStatus = [];
   List<Group> _groups = [];
+  List<Supplier> _suppliers = []; // List of suppliers
   List<TextEditingController> _groupControllers = [];
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
-    _loadGroups();
+    _initializeData(); // Load data in correct order
     _searchController.addListener(_filterProducts);
+  }
+
+  Future<void> _initializeData() async {
+    await _loadSuppliers(); // Load suppliers first
+    await _loadGroups(); // Then groups
+    await _loadProducts(); // Finally products with dependent data
   }
 
   Future<void> _loadProducts() async {
     final products = await DatabaseHelper.instance.getAllProducts();
     setState(() {
       _products = products;
-      _initializeControllers(products);
+      _initializeControllers(products); // Suppliers are now available
       _filterProducts();
     });
   }
@@ -78,12 +86,28 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
     _groupControllers = products
         .map((p) => TextEditingController(text: p.productGroup))
         .toList();
+    _supplierControllers = products
+        .map((p) => TextEditingController(
+            text: _suppliers
+                .firstWhere(
+                  (s) => s.id == p.supplierId,
+                  orElse: () => Supplier(id: -1, name: 'Unknown'),
+                )
+                .name))
+        .toList();
   }
 
   Future<void> _loadGroups() async {
     final groups = await DatabaseHelper.instance.getAllGroups();
     setState(() {
       _groups = groups;
+    });
+  }
+
+  Future<void> _loadSuppliers() async {
+    final suppliers = await DatabaseHelper.instance.getAllSuppliers();
+    setState(() {
+      _suppliers = suppliers;
     });
   }
 
@@ -141,6 +165,10 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                 createdDate: _filteredProducts[i].createdDate,
                 updatedDate: DateTime.now(),
                 status: _selectedStatus[i],
+                supplierId: _suppliers
+                    .firstWhere((s) => s.name == _supplierControllers[i].text,
+                        orElse: () => Supplier(id: -1, name: 'Unknown'))
+                    .id!,
               );
               await DatabaseHelper.instance.updateProduct(updatedProduct);
             }
@@ -274,6 +302,10 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                       DataColumn(
                           label: Text('Discount',
                               style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Supplier',
+                              style: TextStyle(
+                                  color: Colors.white))), // New Supplier column
                       DataColumn(
                           label: Text('Status',
                               style: TextStyle(color: Colors.white))),
@@ -446,6 +478,83 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                             ),
                           ),
                           DataCell(
+                            Container(
+                              width: 150,
+                              child: RawAutocomplete<Supplier>(
+                                textEditingController:
+                                    _supplierControllers[index],
+                                focusNode: FocusNode(),
+                                optionsBuilder:
+                                    (TextEditingValue textEditingValue) {
+                                  if (textEditingValue.text.isEmpty) {
+                                    return const Iterable<Supplier>.empty();
+                                  }
+                                  return _suppliers.where((Supplier supplier) {
+                                    return supplier.name.toLowerCase().contains(
+                                        textEditingValue.text.toLowerCase());
+                                  });
+                                },
+                                displayStringForOption: (Supplier supplier) =>
+                                    supplier.name,
+                                onSelected: (Supplier selection) {
+                                  setState(() {
+                                    _supplierControllers[index].text =
+                                        selection.name;
+                                  });
+                                },
+                                optionsViewBuilder:
+                                    (context, onSelected, options) {
+                                  return Align(
+                                    alignment: Alignment.topLeft,
+                                    child: Material(
+                                      elevation: 4.0,
+                                      child: Container(
+                                        width: 200,
+                                        color: const Color(0xFF020A1B),
+                                        child: ListView.builder(
+                                          padding: EdgeInsets.zero,
+                                          shrinkWrap: true,
+                                          itemCount: options.length,
+                                          itemBuilder: (BuildContext context,
+                                              int index) {
+                                            final Supplier option =
+                                                options.elementAt(index);
+                                            return ListTile(
+                                              title: Text(option.name,
+                                                  style: const TextStyle(
+                                                      color: Colors.white)),
+                                              onTap: () {
+                                                onSelected(option);
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                fieldViewBuilder: (context,
+                                    textEditingController,
+                                    focusNode,
+                                    onFieldSubmitted) {
+                                  return TextFormField(
+                                    controller: _supplierControllers[index],
+                                    focusNode: focusNode,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      hintText: 'Type to search suppliers',
+                                      hintStyle: TextStyle(color: Colors.grey),
+                                    ),
+                                    onChanged: (value) {
+                                      textEditingController.text = value;
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          DataCell(
                             DropdownButton<String>(
                               value: _selectedStatus[index],
                               dropdownColor: Colors.grey[800],
@@ -516,6 +625,9 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
       controller.dispose();
     }
     for (final controller in _discountControllers) {
+      controller.dispose();
+    }
+    for (final controller in _supplierControllers) {
       controller.dispose();
     }
     super.dispose();

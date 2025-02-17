@@ -5,8 +5,10 @@ import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
 import 'package:digisala_pos/models/sales_model.dart';
 import 'package:digisala_pos/models/return_model.dart';
+import 'package:digisala_pos/models/suppplier_model.dart';
 import 'package:digisala_pos/models/user_model.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -35,21 +37,24 @@ class DatabaseHelper {
 
   Future _createDB(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE products(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        barcode TEXT NOT NULL,
-        name TEXT NOT NULL,
-        secondaryName TEXT,
-        expiryDate TEXT,
-        productGroup TEXT NOT NULL,
-        quantity REAL NOT NULL,
-        price REAL NOT NULL,
-        buyingPrice REAL NOT NULL,
-        discount TEXT,
-        createdDate TEXT NOT NULL,
-        updatedDate TEXT NOT NULL,
-        status TEXT NOT NULL
-      )
+     CREATE TABLE products(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  barcode TEXT NOT NULL,
+  name TEXT NOT NULL,
+  secondaryName TEXT,
+  expiryDate TEXT,
+  productGroup TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  price REAL NOT NULL,
+  buyingPrice REAL NOT NULL,
+  discount TEXT,
+  createdDate TEXT NOT NULL,
+  updatedDate TEXT NOT NULL,
+  status TEXT NOT NULL,
+  supplierId INTEGER NOT NULL, -- New field
+  FOREIGN KEY (supplierId) REFERENCES suppliers (id) -- Foreign key constraint
+)
+
     ''');
 
     await db.execute('''
@@ -115,6 +120,101 @@ class DatabaseHelper {
         password TEXT NOT NULL
       )
     ''');
+    await db.execute('''
+  CREATE TABLE suppliers(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+  )
+''');
+
+    await db.execute(''' CREATE TABLE stock_updates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  productId INTEGER NOT NULL,
+  quantityAdded REAL NOT NULL,
+  updateDate TEXT NOT NULL,
+  FOREIGN KEY (productId) REFERENCES products (id)
+)   ''');
+  }
+
+  Future<int> insertSupplier(Supplier supplier) async {
+    final db = await instance.database;
+    return await db.insert('suppliers', supplier.toMap());
+  }
+
+  Future<List<Supplier>> getAllSuppliers() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('suppliers');
+    return List.generate(maps.length, (i) => Supplier.fromMap(maps[i]));
+  }
+
+  Future<int> updateSupplier(Supplier supplier) async {
+    final db = await instance.database;
+    return await db.update(
+      'suppliers',
+      supplier.toMap(),
+      where: 'id = ?',
+      whereArgs: [supplier.id],
+    );
+  }
+
+  Future<int> insertStockUpdate(int productId, double quantityAdded) async {
+    final db = await instance.database;
+    return await db.insert('stock_updates', {
+      'productId': productId,
+      'quantityAdded': quantityAdded,
+      'updateDate': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getStockUpdatesByDate(
+      DateTime date) async {
+    final db = await instance.database;
+    final String formattedDate = date.toIso8601String().split('T').first;
+    return await db.query(
+      'stock_updates',
+      where: 'updateDate LIKE ?',
+      whereArgs: ['$formattedDate%'],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getStockUpdatesByDateRange(
+      DateTime start, DateTime end) async {
+    final db = await instance.database;
+    // Format the start date to include the beginning of the day.
+    final String startIso =
+        DateFormat("yyyy-MM-dd").format(start) + "T00:00:00";
+    // Format the end date to include the end of the day.
+    final String endIso = DateFormat("yyyy-MM-dd").format(end) + "T23:59:59";
+
+    return await db.query(
+      'stock_updates',
+      where: 'updateDate BETWEEN ? AND ?',
+      whereArgs: [startIso, endIso],
+      orderBy: 'updateDate DESC', // Optional: order by most recent first.
+    );
+  }
+
+  Future<int> deleteSupplier(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'suppliers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<Product?> getProductByName(String name) async {
+    final db = await database;
+    List<Map<String, dynamic>> result = await db.query(
+      'products',
+      where: 'name = ?',
+      whereArgs: [name],
+    );
+
+    if (result.isNotEmpty) {
+      return Product.fromMap(result.first);
+    }
+    return null; // Return null if no product is found
   }
 
   Future<int> updatePosIdStatus(int id, String status) async {

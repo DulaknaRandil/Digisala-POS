@@ -161,6 +161,7 @@ class PrinterService {
 
       // Items
       for (final item in items) {
+        double itemDiscount = item['discount'] ?? 0.0;
         bytes += generator.row([
           PosColumn(
             text: '${item['name']}',
@@ -177,6 +178,22 @@ class PrinterService {
             styles: const PosStyles(align: PosAlign.right),
           ),
         ]);
+
+        // Print item discount if applicable
+        if (itemDiscount > 0) {
+          bytes += generator.row([
+            PosColumn(
+              text: 'Discount:',
+              width: 8,
+              styles: const PosStyles(align: PosAlign.right),
+            ),
+            PosColumn(
+              text: '-${itemDiscount.toStringAsFixed(2)} LKR',
+              width: 4,
+              styles: const PosStyles(align: PosAlign.right),
+            ),
+          ]);
+        }
       }
 
       bytes += generator.hr();

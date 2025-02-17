@@ -1,7 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:digisala_pos/models/suppplier_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/utils/pdf_service_stock.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:excel/excel.dart' as ex;
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 class StockDialog extends StatefulWidget {
   final FocusNode searchBarFocusNode;
@@ -72,6 +78,10 @@ class _StockDialogState extends State<StockDialog> {
         .toList();
   }
 
+  List<String> _getUniqueGroups() {
+    return _products.map((product) => product.productGroup).toSet().toList();
+  }
+
   void _resetFilters() {
     setState(() {
       _selectedGroup = 'All';
@@ -80,6 +90,79 @@ class _StockDialogState extends State<StockDialog> {
       _currentPage = 0;
       _displayedProducts = _filterProducts();
     });
+  }
+
+  Future<void> _exportStockToExcel() async {
+    try {
+      // Fetch all products.
+      final products = await DatabaseHelper.instance.getAllProducts();
+      // Fetch all suppliers.
+      final suppliers = await DatabaseHelper.instance.getAllSuppliers();
+
+      // Create a new Excel document.
+      var excel = ex.Excel.createExcel();
+      ex.Sheet sheetObject = excel['Products'];
+
+      // Header row with supplier name.
+      List<ex.CellValue> headerRow = [
+        ex.TextCellValue('Barcode'),
+        ex.TextCellValue('Name'),
+        ex.TextCellValue('Secondary Name'),
+        ex.TextCellValue('Expiry Date'),
+        ex.TextCellValue('Product Group'),
+        ex.TextCellValue('Quantity'),
+        ex.TextCellValue('Price'),
+        ex.TextCellValue('Buying Price'),
+        ex.TextCellValue('Discount'),
+        ex.TextCellValue('Status'),
+        ex.TextCellValue('Supplier'),
+      ];
+      sheetObject.appendRow(headerRow);
+
+      // Append a row for each product.
+      for (var product in products) {
+        // Look up the supplier name.
+        String supplierName = '';
+        try {
+          final supplier = suppliers.firstWhere(
+              (s) => s.id == product.supplierId,
+              orElse: () => Supplier(id: -1, name: 'Unknown'));
+          supplierName = supplier.name;
+        } catch (e) {
+          supplierName = 'Unknown';
+        }
+        List<ex.CellValue> row = [
+          ex.TextCellValue(product.barcode),
+          ex.TextCellValue(product.name),
+          ex.TextCellValue(product.secondaryName),
+          ex.TextCellValue(product.expiryDate != null
+              ? DateFormat('yyyy-MM-dd').format(product.expiryDate!)
+              : ''),
+          ex.TextCellValue(product.productGroup),
+          ex.DoubleCellValue(product.quantity.toDouble()),
+          ex.DoubleCellValue(product.price.toDouble()),
+          ex.DoubleCellValue(product.buyingPrice.toDouble()),
+          ex.TextCellValue(product.discount),
+          ex.TextCellValue(product.status),
+          ex.TextCellValue(supplierName),
+        ];
+        sheetObject.appendRow(row);
+      }
+
+      // Save the Excel file in the app's documents directory.
+      final directory = await getApplicationDocumentsDirectory();
+      final outputFile = File('${directory.path}/products_export.xlsx');
+      await outputFile.writeAsBytes(excel.encode()!);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Products exported to ${outputFile.path}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error exporting products: $e')),
+      );
+      print('Error exporting products: $e');
+    }
   }
 
   @override
@@ -108,7 +191,7 @@ class _StockDialogState extends State<StockDialog> {
     final totalPages = (allFilteredProducts.length / _itemsPerPage).ceil();
 
     return Dialog(
-      backgroundColor: Color.fromRGBO(2, 10, 27, 1),
+      backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
       child: Container(
         width: 1000,
@@ -117,6 +200,7 @@ class _StockDialogState extends State<StockDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Top row: Title and action buttons.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -130,6 +214,16 @@ class _StockDialogState extends State<StockDialog> {
                 ),
                 Row(
                   children: [
+                    // New: Export button placed after Import.
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                      ),
+                      onPressed: _exportStockToExcel,
+                      child: const Text('Export'),
+                    ),
+                    const SizedBox(width: 10),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -253,74 +347,77 @@ class _StockDialogState extends State<StockDialog> {
             Expanded(
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: MaterialStateProperty.all(
-                    const Color.fromARGB(56, 131, 131, 128),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: DataTable(
+                    headingRowColor: MaterialStateProperty.all(
+                      const Color.fromARGB(56, 131, 131, 128),
+                    ),
+                    columns: const [
+                      DataColumn(
+                          label: Text('ID',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Barcode',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Name',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Expiry Date',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Group',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Quantity',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Price',
+                              style: TextStyle(color: Colors.white))),
+                      DataColumn(
+                          label: Text('Status',
+                              style: TextStyle(color: Colors.white))),
+                    ],
+                    rows: _displayedProducts.map((product) {
+                      Color rowColor;
+                      if (product.quantity < 5) {
+                        rowColor = Colors.red.withOpacity(0.2);
+                      } else if (product.quantity < 15) {
+                        rowColor = Colors.yellow.withOpacity(0.2);
+                      } else {
+                        rowColor = Colors.green.withOpacity(0.2);
+                      }
+                      return DataRow(
+                        color: MaterialStateProperty.all(rowColor),
+                        cells: [
+                          DataCell(Text('${product.id}',
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text(product.barcode,
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text(product.name,
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text(
+                              product.expiryDate != null
+                                  ? product.expiryDate!
+                                      .toLocal()
+                                      .toString()
+                                      .split(' ')[0]
+                                  : 'N/A',
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text(product.productGroup,
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text('${product.quantity}',
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text(
+                              '${product.price.toStringAsFixed(2)} LKR',
+                              style: const TextStyle(color: Colors.white))),
+                          DataCell(Text(product.status,
+                              style: const TextStyle(color: Colors.white))),
+                        ],
+                      );
+                    }).toList(),
                   ),
-                  columns: const [
-                    DataColumn(
-                        label:
-                            Text('ID', style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Barcode',
-                            style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Name',
-                            style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Expiry Date',
-                            style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Group',
-                            style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Quantity',
-                            style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Price',
-                            style: TextStyle(color: Colors.white))),
-                    DataColumn(
-                        label: Text('Status',
-                            style: TextStyle(color: Colors.white))),
-                  ],
-                  rows: _displayedProducts.map((product) {
-                    Color rowColor;
-                    if (product.quantity < 5) {
-                      rowColor = Colors.red.withOpacity(0.2);
-                    } else if (product.quantity < 15) {
-                      rowColor = Colors.yellow.withOpacity(0.2);
-                    } else {
-                      rowColor = Colors.green.withOpacity(0.2);
-                    }
-
-                    return DataRow(
-                      color: MaterialStateProperty.all(rowColor),
-                      cells: [
-                        DataCell(Text('${product.id}',
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text(product.barcode,
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text(product.name,
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text(
-                            product.expiryDate != null
-                                ? product.expiryDate!
-                                    .toLocal()
-                                    .toString()
-                                    .split(' ')[0]
-                                : 'N/A',
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text(product.productGroup,
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text('${product.quantity}',
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text('${product.price.toStringAsFixed(2)} LKR',
-                            style: const TextStyle(color: Colors.white))),
-                        DataCell(Text(product.status,
-                            style: const TextStyle(color: Colors.white))),
-                      ],
-                    );
-                  }).toList(),
                 ),
               ),
             ),
@@ -369,10 +466,6 @@ class _StockDialogState extends State<StockDialog> {
         ),
       ),
     );
-  }
-
-  List<String> _getUniqueGroups() {
-    return _products.map((product) => product.productGroup).toSet().toList();
   }
 
   Widget _buildStockButton(String label, int count, Color color, String level) {
@@ -433,10 +526,7 @@ class _StockDialogState extends State<StockDialog> {
                     return TextFormField(
                       controller: controller,
                       focusNode: focusNode,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
                       decoration: InputDecoration(
                         hintText: 'Type to search groups',
                         hintStyle: TextStyle(
@@ -453,7 +543,7 @@ class _StockDialogState extends State<StockDialog> {
                     return Align(
                       alignment: Alignment.topLeft,
                       child: Material(
-                        color: Color.fromRGBO(2, 10, 27, 1),
+                        color: const Color.fromRGBO(2, 10, 27, 1),
                         elevation: 4.0,
                         child: Container(
                           width: MediaQuery.of(context).size.width * 0.25,
@@ -465,9 +555,7 @@ class _StockDialogState extends State<StockDialog> {
                               return ListTile(
                                 title: Text(option.name,
                                     style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                    )),
+                                        color: Colors.white, fontSize: 18)),
                                 onTap: () => onSelected(option),
                               );
                             },
@@ -490,6 +578,5 @@ class _StockDialogState extends State<StockDialog> {
 
 class Group {
   final String name;
-
   Group({required this.name});
 }

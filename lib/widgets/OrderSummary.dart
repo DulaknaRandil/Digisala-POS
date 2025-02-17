@@ -32,14 +32,14 @@ class OrderSummary extends StatefulWidget {
 
 class _OrderSummaryState extends State<OrderSummary> {
   bool isDiscountButtonEnabled = true;
+
   double get subtotal => widget.products
       .fold(0, (sum, product) => sum + product.price * product.quantity);
 
   double get totalDiscount {
-    Map<String, double> items = {};
-    for (var product in widget.products) {
-      items[product.id.toString()] = product.price * product.quantity;
-    }
+    Map<String, dynamic> items = {
+      for (var product in widget.products) product.id.toString(): product,
+    };
     return widget.discountManager.calculateDiscount(items);
   }
 
@@ -87,10 +87,6 @@ class _OrderSummaryState extends State<OrderSummary> {
             setState(() {
               widget.discountManager.setOrderDiscount(value, isPercent);
             });
-            print(
-                'Order Discount Value: ${widget.discountManager.orderDiscountValue}');
-            print(
-                'Order Discount Is Percentage: ${widget.discountManager.orderDiscountIsPercentage}');
             Navigator.pop(context);
           },
           onClose: () => Navigator.pop(context),
@@ -262,9 +258,8 @@ class _OrderSummaryState extends State<OrderSummary> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (widget.discountManager.isItemMode) _buildProductList(),
-                    if (widget.discountManager.isItemMode)
-                      const Divider(color: Color(0xFFAFAFAF)),
+                    _buildProductList(),
+                    const Divider(color: Color(0xFFAFAFAF)),
                     _buildSummaryItem(
                         'Subtotal', '${subtotal.toStringAsFixed(2)} LKR'),
                     if (totalDiscount > 0)

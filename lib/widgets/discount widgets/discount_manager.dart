@@ -12,70 +12,105 @@ class DiscountManager {
   }
 
   void setItemDiscount(String productId, double value, bool isPercent) {
-    if (isItemMode) {
-      itemDiscounts[productId] =
-          ItemDiscount(value: value, isPercentage: isPercent);
-    }
+    itemDiscounts[productId] =
+        ItemDiscount(value: value, isPercentage: isPercent);
   }
 
   void removeItemDiscount(String productId) {
-    if (itemDiscounts.containsKey(productId)) {
-      itemDiscounts[productId] = ItemDiscount(value: 0.0, isPercentage: false);
-    }
+    itemDiscounts.remove(productId);
   }
 
-  double calculateDiscount(Map<String, double> items) {
-    if (items.isEmpty) {
-      reset();
-      return 0.0;
-    }
-
+  double calculateDiscount(Map<String, dynamic> items) {
     double totalDiscount = 0.0;
-    double subtotal = items.values.fold(0.0, (sum, price) => sum + price);
 
-    if (isItemMode) {
-      // Calculate individual item discounts
-      items.forEach((productId, itemPrice) {
-        if (itemDiscounts.containsKey(productId)) {
+    // Calculate item-specific discounts
+    items.forEach((productId, item) {
+      if (item is Product) {
+        double itemTotal = item.price * item.quantity;
+
+        // Built-in product discount
+        if (item.discount.isNotEmpty) {
+          try {
+            if (item.discount.endsWith('%')) {
+              double percentValue =
+                  double.parse(item.discount.replaceAll('%', '').trim());
+              totalDiscount += itemTotal * (percentValue / 100);
+            } else {
+              double fixedValue = double.parse(item.discount.trim());
+              totalDiscount += fixedValue * item.quantity;
+            }
+          } catch (e) {
+            print('Error parsing product discount: ${e.toString()}');
+          }
+        }
+
+        // Manual item discount
+        if (isItemMode && itemDiscounts.containsKey(productId)) {
           final discount = itemDiscounts[productId]!;
           totalDiscount += discount.isPercentage
-              ? itemPrice * (discount.value / 100)
+              ? itemTotal * (discount.value / 100)
               : discount.value;
         }
+      }
+    });
+
+    // Order-level discount if not in item mode
+    if (!isItemMode) {
+      double subtotal = items.values.fold(0.0, (sum, item) {
+        if (item is Product) {
+          return sum + (item.price * item.quantity);
+        }
+        return sum;
       });
-    } else {
-      // Calculate order-level discount
-      if (orderDiscountIsPercentage) {
-        totalDiscount = subtotal * (orderDiscountValue / 100);
-      } else {
-        totalDiscount = orderDiscountValue;
+
+      if (subtotal > 0) {
+        totalDiscount += orderDiscountIsPercentage
+            ? subtotal * (orderDiscountValue / 100)
+            : orderDiscountValue;
       }
     }
 
     return totalDiscount;
   }
 
-  double calculateItemDiscount(String productId, double itemPrice,
+  double calculateItemDiscount(String productId, double itemTotal,
       double currentSubtotal, Product product) {
-    if (currentSubtotal <= 0) {
-      return 0.0;
+    double totalItemDiscount = 0.0;
+
+    // Calculate built-in product discount
+    if (product.discount.isNotEmpty) {
+      try {
+        if (product.discount.endsWith('%')) {
+          double percentValue =
+              double.parse(product.discount.replaceAll('%', '').trim());
+          totalItemDiscount += itemTotal * (percentValue / 100);
+        } else {
+          double fixedValue = double.parse(product.discount.trim());
+          totalItemDiscount += fixedValue * product.quantity;
+        }
+      } catch (e) {
+        print('Error parsing product discount: ${e.toString()}');
+      }
     }
 
-    if (isItemMode) {
-      final itemDiscount = _getItemDiscount(productId, product);
-      if (itemDiscount == null) return 0.0;
+    // Add manual item discount if in item mode
+    if (isItemMode && itemDiscounts.containsKey(productId)) {
+      final discount = itemDiscounts[productId]!;
+      totalItemDiscount += discount.isPercentage
+          ? itemTotal * (discount.value / 100)
+          : discount.value;
+    }
 
-      return itemDiscount.isPercentage
-          ? itemPrice * (itemDiscount.value / 100)
-          : itemDiscount.value;
-    } else {
-      // For order-level discount, calculate proportional amount for this item
-      double totalOrderDiscount = orderDiscountIsPercentage
+    // Add proportional order discount if not in item mode
+    if (!isItemMode && currentSubtotal > 0) {
+      double orderDiscount = orderDiscountIsPercentage
           ? currentSubtotal * (orderDiscountValue / 100)
-          : orderDiscountValue;
-
-      return (itemPrice / currentSubtotal) * totalOrderDiscount;
+          : orderDiscountValue.clamp(0,
+              currentSubtotal); // Prevent negative discount or exceeding subtotal
+      totalItemDiscount += (itemTotal / currentSubtotal) * orderDiscount;
     }
+
+    return totalItemDiscount;
   }
 
   void reset() {
@@ -86,28 +121,13 @@ class DiscountManager {
 
   void toggleMode() {
     isItemMode = !isItemMode;
-    reset();
-  }
 
-  // Helper method to get item-specific discount (manual override or Product discount)
-  ItemDiscount? _getItemDiscount(String productId, Product? product) {
-    if (itemDiscounts.containsKey(productId)) {
-      return itemDiscounts[productId];
+    // Clear order discounts if switching to item mode and vice versa
+    if (isItemMode) {
+      orderDiscountValue = 0.0;
+    } else {
+      itemDiscounts.clear();
     }
-
-    if (product == null) return null;
-
-    // Parse discount from the product
-    if (product.discount.endsWith('%')) {
-      return ItemDiscount(
-          value: double.parse(product.discount.replaceAll('%', '')),
-          isPercentage: true);
-    } else if (product.discount.isNotEmpty) {
-      return ItemDiscount(
-          value: double.parse(product.discount), isPercentage: false);
-    }
-
-    return null;
   }
 }
 

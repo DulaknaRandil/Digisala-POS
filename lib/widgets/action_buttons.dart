@@ -6,6 +6,8 @@ class ActionButtons extends StatelessWidget {
   final VoidCallback? onUpdatePressed;
   final VoidCallback? onHistoryPressed;
   final VoidCallback? onSecurityPressed;
+  final VoidCallback? onSuppliersPressed;
+  final VoidCallback? onGRNPressed;
 
   const ActionButtons({
     Key? key,
@@ -14,6 +16,8 @@ class ActionButtons extends StatelessWidget {
     this.onUpdatePressed,
     this.onHistoryPressed,
     this.onSecurityPressed,
+    this.onSuppliersPressed,
+    this.onGRNPressed,
   }) : super(key: key);
 
   @override
@@ -56,6 +60,20 @@ class ActionButtons extends StatelessWidget {
             backgroundColor: const Color(0xFFFF4244),
             textColor: Colors.white,
             onPressed: onSecurityPressed,
+          ),
+          const SizedBox(width: 12),
+          _buildActionButton(
+            text: 'Suppliers',
+            backgroundColor: const Color(0xFF8A2BE2), // Example color
+            textColor: Colors.white,
+            onPressed: onSuppliersPressed,
+          ),
+          const SizedBox(width: 12),
+          _buildActionButton(
+            text: 'GRN',
+            backgroundColor: const Color(0xFF4682B4), // Example color
+            textColor: Colors.white,
+            onPressed: onGRNPressed,
           ),
           SizedBox(
             width: 300,

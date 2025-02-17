@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:digisala_pos/utils/printer_service.dart';
 import 'package:digisala_pos/utils/receipt_pdf.dart';
 import 'package:digisala_pos/widgets/access_control.dart';
+import 'package:digisala_pos/widgets/gnr_form.dart';
 import 'package:digisala_pos/widgets/printerSelectionDialog.dart';
 import 'package:digisala_pos/widgets/receipt_setup.dart';
+import 'package:digisala_pos/widgets/settings_menu_button.dart';
+import 'package:digisala_pos/widgets/supplier_form.dart';
 import 'package:flutter/material.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
@@ -78,15 +81,17 @@ class _HomeScreenState extends State<HomeScreen> {
           _checkoutList.indexWhere((p) => p.id == product.id);
 
       if (existingProductIndex != -1) {
+        // Allow adding decimal quantities
         if (_checkoutList[existingProductIndex].quantity < product.quantity) {
-          _checkoutList[existingProductIndex].quantity += 1;
+          _checkoutList[existingProductIndex].quantity +=
+              1; // Example increment
         } else {
           _productaddshowSnackBar(
               'Cannot add more of ${product.name}, not enough stock.');
         }
       } else {
         if (product.quantity > 0) {
-          product.quantity = 1;
+          product.quantity = 1; // Start with a decimal quantity
           _checkoutList.add(product);
         } else {
           _productaddshowSnackBar(
@@ -94,6 +99,14 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     });
+  }
+
+  void _updateProduct(Product product, double change) async {
+    setState(() {
+      product.quantity += change;
+      if (product.quantity < 0.1) product.quantity = 0.1; // Minimum quantity
+    });
+    _loadProducts();
   }
 
   void _productaddshowSnackBar(String message) {
@@ -114,14 +127,6 @@ class _HomeScreenState extends State<HomeScreen> {
         duration: Duration(seconds: 2),
       ),
     );
-  }
-
-  void _updateProduct(Product product, double change) async {
-    setState(() {
-      product.quantity += change;
-      if (product.quantity < 1) product.quantity = 1;
-    });
-    _loadProducts();
   }
 
   void _removeProduct(Product product) async {
@@ -176,13 +181,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   double _calculateTotal() {
-    final subtotal = _calculateSubtotal();
+    // Calculate the subtotal by summing up the total price of each product in the checkout list
+    final subtotal = _checkoutList.fold(
+      0.0,
+      (sum, product) => sum + (product.price * product.quantity),
+    );
+
+    // Calculate the total discount using the DiscountManager
     final discount = _discountManager.calculateDiscount(
       {
-        for (var product in _checkoutList)
-          product.id.toString(): product.price * product.quantity
+        for (var product in _checkoutList) product.id.toString(): product,
       },
     );
+
+    // Return the total by subtracting the discount from the subtotal
     return subtotal - discount;
   }
 
@@ -289,8 +301,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<bool> _handleDatabaseExport() async {
+    return await DatabaseHelper.instance.exportDatabase();
+  }
+
+  Future<bool> _handleDatabaseImport() async {
+    return await DatabaseHelper.instance.importDatabase();
+  }
+
   Future<Map<String, dynamic>> _createSalesRecord(
-      String paymentMethod, double change, double paidamount) async {
+      String paymentMethod, double change, double paidAmount) async {
     final sales = Sales(
       date: DateTime.now(),
       time: TimeOfDay.now().format(context),
@@ -298,8 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
       subtotal: _calculateSubtotal(),
       discount: _discountManager.calculateDiscount(
         {
-          for (var product in _checkoutList)
-            product.id.toString(): product.price * product.quantity
+          for (var product in _checkoutList) product.id.toString(): product,
         },
       ),
       total: _calculateTotal(),
@@ -326,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DatabaseHelper.instance.updateProduct(originalProduct);
     }
 
-    _printReceipt(sales, salesId, paidamount, change, paymentMethod);
+    _printReceipt(sales, salesId, paidAmount, change, paymentMethod);
 
     final currentCheckoutList = List<Product>.from(_checkoutList);
 
@@ -512,6 +531,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showGRNDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return GRNForm(
+          searchBarFocusNode: _searchBarFocusNode,
+        );
+      },
+    );
+  }
+
+  void _showSupplierDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return SupplierForm(
+          searchBarFocusNode: _searchBarFocusNode,
+        );
+      },
+    );
+  }
+
   void _handleClose() {
     setState(() {
       _checkoutList.clear();
@@ -568,83 +609,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const Spacer(),
                 PopupMenuButton<String>(
+                  tooltip: 'More options',
                   color: const Color(0xFF2D2D2D),
                   popUpAnimationStyle: AnimationStyle(
                     curve: Curves.easeInOut,
                     duration: const Duration(milliseconds: 200),
                   ),
-                  icon: Icon(Icons.settings_applications_outlined,
+                  icon: Icon(Icons.more_horiz_outlined,
                       size: 50, color: Colors.white),
                   onSelected: (value) async {
                     bool success;
                     switch (value) {
-                      case 'Printer Settings':
-                        _showPrinterSettingsDialog();
-                        break;
                       case 'Return Sales':
                         _showReturnList();
-                        break;
-                      case 'Export Database':
-                        success =
-                            await DatabaseHelper.instance.exportDatabase();
-                        _dbStatusshowSnackBar(
-                            success
-                                ? 'Database exported successfully!'
-                                : 'Failed to export database.',
-                            success);
-                        break;
-                      case 'Import Database':
-                        success =
-                            await DatabaseHelper.instance.importDatabase();
-                        _dbStatusshowSnackBar(
-                            success
-                                ? 'Database imported successfully!'
-                                : 'Failed to import database.',
-                            success);
-                        break;
-                      case 'Receipt Setup':
-                        _showReceiptSetupDialog();
-                        break;
-                      case 'Thermal Setup':
-                        ThermalPrinterTestService(context);
                         break;
                     }
                   },
                   itemBuilder: (BuildContext context) =>
                       <PopupMenuEntry<String>>[
                     const PopupMenuItem<String>(
-                      value: 'Printer Settings',
-                      child: Text(
-                        'Printer Settings',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    const PopupMenuItem<String>(
                       value: 'Return Sales',
                       child: Text('Return Sales',
                           style: TextStyle(color: Colors.white)),
                     ),
-                    const PopupMenuItem<String>(
-                      value: 'Export Database',
-                      child: Text('Export Database',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'Import Database',
-                      child: Text('Import Database',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'Receipt Setup',
-                      child: Text('Receipt Setup',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'Thermal Setup',
-                      child: Text('Thermal Setup',
-                          style: TextStyle(color: Colors.white)),
-                    ),
                   ],
+                ),
+                SettingsMenuButton(
+                  onPrinterSettings: _showPrinterSettingsDialog,
+                  onReceiptSetup: _showReceiptSetupDialog,
+                  onExportDatabase: _handleDatabaseExport,
+                  onImportDatabase: _handleDatabaseImport,
+                  onShowSnackBar: _dbStatusshowSnackBar,
                 ),
               ],
             ),
@@ -683,6 +678,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         onUpdatePressed: _showProductUpdateForm,
                         onHistoryPressed: _showSalesHistory,
                         onSecurityPressed: _showUserAccessControl,
+                        onGRNPressed: _showGRNDialog,
+                        onSuppliersPressed: _showSupplierDialog,
                       ),
                     ],
                   ),
