@@ -323,8 +323,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    final output = await getTemporaryDirectory();
-    final outputFile = File("${output.path}/receipt_$salesId.pdf");
+    final output = await getDownloadsDirectory();
+    final outputFile = File("${output?.path}/receipt_$salesId.pdf");
     await outputFile.writeAsBytes(await pdf.save());
 
     await Printing.layoutPdf(
@@ -352,6 +352,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.of(context).pop();
           },
           onPrintReceipt: (double paidAmount, double balance) async {
+            // Check if there's a selected printer
+            if (_printerService.selectedPrinter == null) {
+              _showSnackBar('Please select a printer first');
+              _showPrinterSettingsDialog();
+              return;
+            }
             await _createSalesRecord(paymentMethod, balance, paidAmount);
             print('Print Receipt');
             Future.delayed(const Duration(seconds: 2), () {
@@ -424,9 +430,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       await DatabaseHelper.instance.insertSalesItem(salesItem);
 
-      final originalProduct = _products.firstWhere((p) => p.id == product.id);
-      originalProduct.quantity -= product.quantity;
-      await DatabaseHelper.instance.updateProduct(originalProduct);
+      final originalProduct =
+          await DatabaseHelper.instance.getProductById(product.id!);
+      if (originalProduct != null) {
+        originalProduct.quantity -= product.quantity;
+        await DatabaseHelper.instance.updateProduct(originalProduct);
+      }
     }
 
     _printReceipt(sales, salesId, paidAmount, change, paymentMethod);
@@ -450,13 +459,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _printReceipt(Sales sales, int salesId, double paidAmount,
       double change, String paymentMethod) async {
     try {
-      // Check if there's a selected printer
-      if (_printerService.selectedPrinter == null) {
-        _showSnackBar('Please select a printer first');
-        _showPrinterSettingsDialog();
-        return;
-      }
-
       // Format items for printing
       final items = _checkoutList
           .map((product) => {
@@ -584,7 +586,15 @@ class _HomeScreenState extends State<HomeScreen> {
         return ProductForm(
           onSave: (productData) {
             print('New Product: $productData');
-            Navigator.of(context).pushNamed('/dashboard');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  userRole: widget.userRole,
+                  username: widget.username,
+                ),
+              ),
+            );
           },
           onClose: () {
             Navigator.of(context).pop();
@@ -737,57 +747,71 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const Divider(color: Color(0xFF2D2D2D), thickness: 1),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 25,
-                  ),
-                  Column(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Calculate responsive widths
+                  final orderSummaryWidth = constraints.maxWidth * 0.3;
+                  final productListWidth = constraints.maxWidth * 0.7 -
+                      20; // 20 is the SizedBox width
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: ProductList(
-                          products: _checkoutList,
-                          onQuantityChange: (String productId, double change) {
-                            final product = _checkoutList.firstWhere(
-                                (p) => p.id.toString() == productId);
-                            _updateProduct(product, change);
-                          },
-                          onRemove: (String productId) {
-                            final product = _checkoutList.firstWhere(
-                                (p) => p.id.toString() == productId);
-                            _removeProduct(product);
-                          },
-                          searchBarFocusNode: _searchBarFocusNode,
-                        ),
-                      ),
+                      // Product List Section
                       SizedBox(
-                        height: 15,
-                      ),
-                      if (widget.userRole.toLowerCase() == 'admin')
-                        ActionButtons(
-                          onNewPressed: _showNewProductForm,
-                          onGroupPressed: _showGroupForm,
-                          onUpdatePressed: _showProductUpdateForm,
-                          onHistoryPressed: _showSalesHistory,
-                          onSecurityPressed: _showUserAccessControl,
-                          onGRNPressed: _showGRNDialog,
-                          onSuppliersPressed: _showSupplierDialog,
+                        width: productListWidth,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: ProductList(
+                                products: _checkoutList,
+                                onQuantityChange:
+                                    (String productId, double change) {
+                                  final product = _checkoutList.firstWhere(
+                                      (p) => p.id.toString() == productId);
+                                  _updateProduct(product, change);
+                                },
+                                onRemove: (String productId) {
+                                  final product = _checkoutList.firstWhere(
+                                      (p) => p.id.toString() == productId);
+                                  _removeProduct(product);
+                                },
+                                searchBarFocusNode: _searchBarFocusNode,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (widget.userRole.toLowerCase() == 'admin')
+                              ActionButtons(
+                                onNewPressed: _showNewProductForm,
+                                onGroupPressed: _showGroupForm,
+                                onUpdatePressed: _showProductUpdateForm,
+                                onHistoryPressed: _showSalesHistory,
+                                onSecurityPressed: _showUserAccessControl,
+                                onGRNPressed: _showGRNDialog,
+                                onSuppliersPressed: _showSupplierDialog,
+                              ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(width: 20),
+
+                      // Order Summary Section
+                      SizedBox(
+                        width: orderSummaryWidth,
+                        child: OrderSummary(
+                          products: _checkoutList,
+                          onClose: _handleVoidOrder,
+                          onDiscount: _showDiscountCalculator,
+                          onPayment: () => _handlePayment('Cash'),
+                          onCashPayment: _handleCashPayment,
+                          onCardPayment: _handleCardPayment,
+                          discountManager: _discountManager,
+                          salesId: _currentSalesId,
+                        ),
+                      ),
                     ],
-                  ),
-                  const SizedBox(width: 70),
-                  OrderSummary(
-                    products: _checkoutList,
-                    onClose: _handleVoidOrder,
-                    onDiscount: _showDiscountCalculator,
-                    onPayment: () => _handlePayment('Cash'),
-                    onCashPayment: _handleCashPayment,
-                    onCardPayment: _handleCardPayment,
-                    discountManager: _discountManager,
-                    salesId: _currentSalesId,
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 20),

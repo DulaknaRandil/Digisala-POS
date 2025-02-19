@@ -149,6 +149,7 @@ class LoginScreen extends StatelessWidget {
         if (posId != null && posId.status == 'active') {
           if (existingUser != null && existingUser.password == pin) {
             print('User credentials valid, navigating to dashboard...');
+
             Navigator.pop(context); // Hide the progress indicator
             Navigator.pushReplacement(
               context,

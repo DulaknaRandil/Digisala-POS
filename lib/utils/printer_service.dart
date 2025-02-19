@@ -101,7 +101,7 @@ class PrinterService {
             final imageBytes = await file.readAsBytes();
             final image = img.decodeImage(imageBytes);
             if (image != null) {
-              final resized = img.copyResize(image, width: 380);
+              final resized = img.copyResize(image, width: 200);
               bytes += generator.image(resized);
             }
           }
@@ -306,7 +306,7 @@ class PrinterService {
             final image = img.decodeImage(imageBytes);
             if (image != null) {
               // Resize image if needed
-              final resized = img.copyResize(image, width: 380);
+              final resized = img.copyResize(image, width: 200);
               bytes += generator.image(resized);
             }
           }

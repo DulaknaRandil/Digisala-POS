@@ -21,11 +21,17 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   List<SalesItem> _salesItems = [];
   int _salesCount = 0;
   double _totalAmount = 0.0;
-
+  double _totalProfit = 0.0; // New variable for total profit
   @override
   void initState() {
     super.initState();
     _loadTodaySales();
+  }
+
+  double calculateProfit(
+      double price, double buyingPrice, double discount, double quantity) {
+    final discountedPrice = price - discount;
+    return (discountedPrice - buyingPrice) * quantity;
   }
 
   Future<void> _loadTodaySales() async {
@@ -36,8 +42,19 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
     final sales = await DatabaseHelper.instance.getSalesByDate(today);
     print('Sales fetched: ${sales.length}');
 
+    // Calculate total profit
+    double profit = 0.0;
+    for (var sale in sales) {
+      final items = await DatabaseHelper.instance.getSalesItems(sale.id!);
+      for (var item in items) {
+        profit += calculateProfit(
+            item.price, item.buyingPrice, item.discount, item.quantity);
+      }
+    }
+
     setState(() {
       _salesList = sales;
+      _totalProfit = profit;
       _updateSalesSummary();
     });
   }
@@ -105,6 +122,7 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
               pw.SizedBox(height: 2),
               pw.Text('Sales Count: $_salesCount'),
               pw.Text('Total Amount: $_totalAmount LKR'),
+              pw.Text('Total Profit: ${_totalProfit.toStringAsFixed(2)} LKR'),
             ],
           );
         },
@@ -470,8 +488,13 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
               ),
               const Divider(color: Colors.white),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Text('Total Profit: $_totalProfit LKR',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
                   ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pop();

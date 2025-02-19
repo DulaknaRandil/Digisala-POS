@@ -128,125 +128,109 @@ class _SettingsPinDialogState extends State<SettingsPinDialog>
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color(0xFF020A1B),
-      child: Padding(
-        padding: const EdgeInsets.all(18.0),
-        child: SizedBox(
-          width: 300,
-          height: 465,
-          child: Column(
-            children: [
-              AnimatedBuilder(
-                animation: _shakeAnimation,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(_shakeAnimation.value, 0),
-                    child: child,
-                  );
-                },
-                child: Row(
-                  children: [
-                    const SizedBox(width: 85),
-                    Text(
-                      headerText,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isError ? Colors.red : Colors.white,
+    return SingleChildScrollView(
+      child: Dialog(
+        backgroundColor: const Color(0xFF020A1B),
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: SizedBox(
+            width: 300,
+            height: 420,
+            child: Column(
+              children: [
+                AnimatedBuilder(
+                  animation: _shakeAnimation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(_shakeAnimation.value, 0),
+                      child: child,
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 85),
+                      Text(
+                        headerText,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isError ? Colors.red : Colors.white,
+                        ),
                       ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () {
+                          widget.onCancel();
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    4,
+                    (index) => _buildPinDot(index < currentPin.length),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildNumberButton('1'),
+                        _buildNumberButton('2'),
+                        _buildNumberButton('3'),
+                      ],
                     ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () {
-                        widget.onCancel();
-                        Navigator.of(context).pop();
-                      },
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildNumberButton('4'),
+                        _buildNumberButton('5'),
+                        _buildNumberButton('6'),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildNumberButton('7'),
+                        _buildNumberButton('8'),
+                        _buildNumberButton('9'),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(width: 76),
+                        _buildNumberButton('0'),
+                        SizedBox(
+                          width: 60,
+                          height: 60,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: const CircleBorder(),
+                              backgroundColor: Colors.transparent,
+                            ),
+                            onPressed: _handleDelete,
+                            child: const Icon(
+                              Icons.backspace_outlined,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  4,
-                  (index) => _buildPinDot(index < currentPin.length),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildNumberButton('1'),
-                      _buildNumberButton('2'),
-                      _buildNumberButton('3'),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildNumberButton('4'),
-                      _buildNumberButton('5'),
-                      _buildNumberButton('6'),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildNumberButton('7'),
-                      _buildNumberButton('8'),
-                      _buildNumberButton('9'),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 76),
-                      _buildNumberButton('0'),
-                      SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: const CircleBorder(),
-                            backgroundColor: Colors.transparent,
-                          ),
-                          onPressed: _handleDelete,
-                          child: const Icon(
-                            Icons.backspace_outlined,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Opacity(
-                opacity: 0,
-                child: TextField(
-                  controller: _pinController,
-                  focusNode: _focusNode,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  onChanged: (value) {
-                    setState(() {
-                      currentPin = value;
-                      if (currentPin.length == 4) {
-                        _validatePin();
-                      }
-                    });
-                  },
-                  autofocus: true,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

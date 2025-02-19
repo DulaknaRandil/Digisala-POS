@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/widgets/delete_history_dialog.dart';
+import 'package:digisala_pos/widgets/sales_report.dart';
 import 'package:flutter/material.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
 import 'package:digisala_pos/models/sales_model.dart';
@@ -26,7 +29,7 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
   DateTimeRange? _selectedDateRange;
   int _salesCount = 0;
   double _totalAmount = 0.0;
-
+  List<Product> _products = [];
   @override
   void initState() {
     super.initState();
@@ -41,6 +44,22 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
     });
   }
 
+  Future<void> _loadProducts() async {
+    final products = await DatabaseHelper.instance.getAllProducts();
+    setState(() {
+      _products = products;
+    });
+  }
+
+  _openSalesReport() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return SalesReportDialog();
+      },
+    );
+  }
+
   Future<void> _searchSales() async {
     if (_searchQuery.isNotEmpty) {
       final sales = await DatabaseHelper.instance.searchSalesById(_searchQuery);
@@ -52,6 +71,17 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
       final sales = await DatabaseHelper.instance.searchSalesByDateRange(
         _selectedDateRange!.start,
         _selectedDateRange!.end,
+      );
+      setState(() {
+        _salesList = sales;
+        _updateSalesSummary();
+      });
+    } else if (_selectedDateRange == null) {
+      final today = DateTime.now();
+      final sales = await DatabaseHelper.instance.searchSalesByDateRange(
+        DateTime(today.year, today.month, today.day, 0, 0, 0), // Today 00:00:00
+        DateTime(
+            today.year, today.month, today.day, 23, 59, 59), // Today 23:59:59
       );
       setState(() {
         _salesList = sales;
@@ -183,6 +213,16 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
     await Printing.sharePdf(bytes: bytes, filename: 'sales_history.pdf');
   }
 
+  // Add this method to your SalesHistoryDialog class
+  void _openDeletedSalesHistory() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const DeleteSalesHistoryDialog();
+      },
+    );
+  }
+
   Future<void> _printDocument() async {
     final bytes = await _generatePdfContent();
     await Printing.layoutPdf(
@@ -204,6 +244,7 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // At the top of your SalesHistoryDialog class
+              // Update the top buttons row in build method to include Deleted Sales button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -217,6 +258,27 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                   ),
                   Row(
                     children: [
+                      // Add the new Deleted Sales button
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Deleted Sales'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _openDeletedSalesHistory,
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.assessment),
+                        label: const Text('Sales Report'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _openSalesReport,
+                      ),
+                      const SizedBox(width: 10),
                       ElevatedButton.icon(
                         icon: const Icon(Icons.picture_as_pdf),
                         label: const Text('PDF'),
@@ -385,12 +447,15 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                       Text('Discount', style: TextStyle(color: Colors.white))),
               DataColumn(
                   label: Text('Total', style: TextStyle(color: Colors.white))),
+              DataColumn(
+                label: Text('Actions', style: TextStyle(color: Colors.white)),
+              ),
             ],
             rows: _salesList.map((sales) {
               return DataRow(
-                color: MaterialStateProperty.resolveWith<Color>(
-                  (Set<MaterialState> states) {
-                    if (states.contains(MaterialState.selected)) {
+                color: WidgetStateProperty.resolveWith<Color>(
+                  (Set<WidgetState> states) {
+                    if (states.contains(WidgetState.selected)) {
                       return Theme.of(context)
                           .colorScheme
                           .primary
@@ -415,6 +480,117 @@ class _SalesHistoryDialogState extends State<SalesHistoryDialog> {
                       style: const TextStyle(color: Colors.white))),
                   DataCell(Text('${sales.total}',
                       style: const TextStyle(color: Colors.white))),
+                  DataCell(
+                    PopupMenuButton<String>(
+                      color: const Color.fromRGBO(2, 10, 27, 1),
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      onSelected: (String choice) async {
+                        if (choice == 'Delete') {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                backgroundColor:
+                                    const Color.fromRGBO(2, 10, 27, 1),
+                                title: const Text(
+                                  'Confirm Delete',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                content: const Text(
+                                  'Are you sure you want to delete this sale? This action cannot be undone.',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(false),
+                                  ),
+                                  TextButton(
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(true),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+
+                          if (confirmed == true) {
+                            await DatabaseHelper.instance
+                                .deleteSaleAndItems(sales.id!, false);
+                            await _loadProducts();
+                            _loadSales();
+                          }
+                        } else if (choice == 'Delete and Update') {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                backgroundColor:
+                                    const Color.fromRGBO(2, 10, 27, 1),
+                                title: const Text(
+                                  'Confirm Delete and Update Stock',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                content: const Text(
+                                  'Are you sure you want to delete this sale and update the product stock? This action cannot be undone.',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(false),
+                                  ),
+                                  TextButton(
+                                    child: const Text(
+                                      'Delete and Update',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(true),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+
+                          if (confirmed == true) {
+                            await DatabaseHelper.instance
+                                .deleteSaleAndItems(sales.id!, true);
+                            await _loadProducts();
+                            _loadSales();
+                          }
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => [
+                        const PopupMenuItem<String>(
+                          value: 'Delete',
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'Delete and Update',
+                          child: Text(
+                            'Delete and Update Stock',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
                 onSelectChanged: (selected) {
                   if (selected == true) {

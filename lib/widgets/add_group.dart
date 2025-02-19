@@ -89,179 +89,182 @@ class _GroupFormState extends State<GroupForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.4,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF020A1B),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'New Group',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF949391),
-                  ),
-                ),
-                IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      widget.searchBarFocusNode.requestFocus();
-                    }),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SingleChildScrollView(
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.4,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF020A1B),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      hintText: 'Type your name here',
-                      hintStyle: const TextStyle(
+                  const Text(
+                    'New Group',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 24,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF949391),
+                    ),
+                  ),
+                  IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        widget.searchBarFocusNode.requestFocus();
+                      }),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        hintText: 'Type your name here',
+                        hintStyle: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFF1F5F9),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(55),
+                          borderSide: BorderSide(
+                            color: Color(0xFFF1F5F9),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFFF1F5F9),
                       ),
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(55),
-                        borderSide: BorderSide(
-                          color: Color(0xFFF1F5F9),
-                          width: 2,
-                        ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a name';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _addGroup,
+                      child: const Text('Add New Group'),
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(color: Color(0xFF2D2D2D)),
+                    const Text(
+                      'Group List',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF1F5F9),
                       ),
                     ),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFF1F5F9),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search groups',
+                        hintStyle: const TextStyle(color: Colors.white),
+                        prefixIcon:
+                            const Icon(Icons.search, color: Colors.white),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.white),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _addGroup,
-                    child: const Text('Add New Group'),
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(color: Color(0xFF2D2D2D)),
-                  const Text(
-                    'Group List',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFF1F5F9),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search groups',
-                      hintStyle: const TextStyle(color: Colors.white),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white),
-                      border: OutlineInputBorder(
+                    const SizedBox(height: 10),
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.white),
                       ),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(
-                            label: Text(
-                              'Group Name',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                          DataColumn(
-                            headingRowAlignment: MainAxisAlignment.end,
-                            label: Text(
-                              'Actions',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ],
-                        rows: List<DataRow>.generate(
-                          _filteredGroups.length,
-                          (index) => DataRow(
-                            cells: [
-                              DataCell(
-                                TextFormField(
-                                  controller: _controllers[index],
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Name cannot be empty';
-                                    }
-                                    return null;
-                                  },
-                                ),
+                      child: SingleChildScrollView(
+                        child: DataTable(
+                          columns: const [
+                            DataColumn(
+                              label: Text(
+                                'Group Name',
+                                style: TextStyle(color: Colors.white),
                               ),
-                              DataCell(
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment
-                                      .end, // Aligns the button to the end
-                                  children: [
-                                    IconButton(
-                                      icon:
-                                          Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () => _deleteGroup(index),
+                            ),
+                            DataColumn(
+                              headingRowAlignment: MainAxisAlignment.end,
+                              label: Text(
+                                'Actions',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                          rows: List<DataRow>.generate(
+                            _filteredGroups.length,
+                            (index) => DataRow(
+                              cells: [
+                                DataCell(
+                                  TextFormField(
+                                    controller: _controllers[index],
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
                                     ),
-                                  ],
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Name cannot be empty';
+                                      }
+                                      return null;
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ],
+                                DataCell(
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment
+                                        .end, // Aligns the button to the end
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () => _deleteGroup(index),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _saveUpdates,
-                    child: const Text('Save & Update'),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _saveUpdates,
+                      child: const Text('Save & Update'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

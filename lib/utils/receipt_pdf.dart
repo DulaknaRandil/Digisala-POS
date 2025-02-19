@@ -54,8 +54,8 @@ class _ThermalPrinterDialogState extends State<ThermalPrinterDialog> {
       "Teste Network print",
       styles: const PosStyles(
         bold: true,
-        height: PosTextSize.size3,
-        width: PosTextSize.size3,
+        height: PosTextSize.size2,
+        width: PosTextSize.size2,
       ),
     );
     bytes += generator.cut();

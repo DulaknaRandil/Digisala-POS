@@ -64,6 +64,9 @@ class _ReceiptSetupDialogState extends State<ReceiptSetupDialog> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowCompression: true,
+        compressionQuality:
+            0, // Disable compression to avoid temp file creation issues
+        allowMultiple: true,
       );
 
       if (result != null && result.files.single.path != null) {

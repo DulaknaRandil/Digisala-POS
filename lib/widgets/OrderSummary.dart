@@ -224,70 +224,67 @@ class _OrderSummaryState extends State<OrderSummary> {
 
     return Expanded(
       child: SingleChildScrollView(
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Order : ${widget.salesId}',
+                  style: TextStyle(
+                    color: Color(0xFFD1D5DB),
+                    fontSize: 22,
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                IconButton(
+                  onPressed: widget.onClose,
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  iconSize: 36,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2D2D2D),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Order : ${widget.salesId}',
-                    style: TextStyle(
-                      color: Color(0xFFD1D5DB),
-                      fontSize: 22,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w500,
-                    ),
+                  _buildProductList(),
+                  const Divider(color: Color(0xFFAFAFAF)),
+                  _buildSummaryItem(
+                      'Subtotal', '${subtotal.toStringAsFixed(2)} LKR'),
+                  if (totalDiscount > 0)
+                    _buildSummaryItem(
+                        'Discount', '-${totalDiscount.toStringAsFixed(2)} LKR'),
+                  const Divider(color: Color(0xFFAFAFAF)),
+                  _buildTotalItem('Total', '${total.toStringAsFixed(2)} LKR'),
+                  const SizedBox(height: 20),
+                  _buildDiscountControls(),
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildButton(
+                          'Discount',
+                          isDiscountButtonEnabled
+                              ? _openOrderDiscountCalculator
+                              : null),
+                      _buildButton(
+                          'Payment', total > 0 ? widget.onPayment : null),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: widget.onClose,
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    iconSize: 36,
-                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2D2D2D),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildProductList(),
-                    const Divider(color: Color(0xFFAFAFAF)),
-                    _buildSummaryItem(
-                        'Subtotal', '${subtotal.toStringAsFixed(2)} LKR'),
-                    if (totalDiscount > 0)
-                      _buildSummaryItem('Discount',
-                          '-${totalDiscount.toStringAsFixed(2)} LKR'),
-                    const Divider(color: Color(0xFFAFAFAF)),
-                    _buildTotalItem('Total', '${total.toStringAsFixed(2)} LKR'),
-                    const SizedBox(height: 20),
-                    _buildDiscountControls(),
-                    const SizedBox(height: 5),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildButton(
-                            'Discount',
-                            isDiscountButtonEnabled
-                                ? _openOrderDiscountCalculator
-                                : null),
-                        _buildButton(
-                            'Payment', total > 0 ? widget.onPayment : null),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

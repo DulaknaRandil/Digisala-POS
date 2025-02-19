@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:digisala_pos/models/delete_sale_item_model.dart';
+import 'package:digisala_pos/models/delete_sale_model.dart';
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/pos_id_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
@@ -10,6 +12,7 @@ import 'package:digisala_pos/models/user_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class DatabaseHelper {
@@ -37,24 +40,23 @@ class DatabaseHelper {
 
   Future _createDB(Database db, int version) async {
     await db.execute('''
-     CREATE TABLE products(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  barcode TEXT NOT NULL,
-  name TEXT NOT NULL,
-  secondaryName TEXT,
-  expiryDate TEXT,
-  productGroup TEXT NOT NULL,
-  quantity REAL NOT NULL,
-  price REAL NOT NULL,
-  buyingPrice REAL NOT NULL,
-  discount TEXT,
-  createdDate TEXT NOT NULL,
-  updatedDate TEXT NOT NULL,
-  status TEXT NOT NULL,
-  supplierId INTEGER NOT NULL, -- New field
-  FOREIGN KEY (supplierId) REFERENCES suppliers (id) -- Foreign key constraint
-)
-
+      CREATE TABLE products(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        barcode TEXT NOT NULL,
+        name TEXT NOT NULL,
+        secondaryName TEXT,
+        expiryDate TEXT,
+        productGroup TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        price REAL NOT NULL,
+        buyingPrice REAL NOT NULL,
+        discount TEXT,
+        createdDate TEXT NOT NULL,
+        updatedDate TEXT NOT NULL,
+        status TEXT NOT NULL,
+        supplierId INTEGER NOT NULL,
+        FOREIGN KEY (supplierId) REFERENCES suppliers (id)
+      )
     ''');
 
     await db.execute('''
@@ -120,20 +122,53 @@ class DatabaseHelper {
         password TEXT NOT NULL
       )
     ''');
-    await db.execute('''
-  CREATE TABLE suppliers(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
-  )
-''');
 
-    await db.execute(''' CREATE TABLE stock_updates (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  productId INTEGER NOT NULL,
-  quantityAdded REAL NOT NULL,
-  updateDate TEXT NOT NULL,
-  FOREIGN KEY (productId) REFERENCES products (id)
-)   ''');
+    await db.execute('''
+      CREATE TABLE suppliers(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE stock_updates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        productId INTEGER NOT NULL,
+        quantityAdded REAL NOT NULL,
+        updateDate TEXT NOT NULL,
+        FOREIGN KEY (productId) REFERENCES products (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE delete_sales(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL,
+        subtotal REAL NOT NULL,
+        discount REAL NOT NULL,
+        total REAL NOT NULL,
+        stockUpdated INTEGER NOT NULL
+      )
+    ''');
+
+    // Modified table schema: added deleteSaleItemId column
+    await db.execute('''
+      CREATE TABLE delete_sales_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deleteSaleId INTEGER NOT NULL,
+        deleteSaleItemId INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        buyingPrice REAL NOT NULL,
+        price REAL NOT NULL,
+        discount REAL NOT NULL,
+        total REAL NOT NULL,
+        refund INTEGER NOT NULL,
+        FOREIGN KEY (deleteSaleId) REFERENCES delete_sales (id)
+      )
+    ''');
   }
 
   Future<int> insertSupplier(Supplier supplier) async {
@@ -155,6 +190,126 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [supplier.id],
     );
+  }
+
+  Future<int> insertDeleteSale(DeleteSale deleteSale) async {
+    final db = await instance.database;
+    return await db.insert('delete_sales', deleteSale.toMap());
+  }
+
+  Future<int> insertDeleteSaleItem(DeleteSaleItem deleteSaleItem) async {
+    final db = await instance.database;
+    return await db.insert('delete_sales_items', deleteSaleItem.toMap());
+  }
+
+  Future<List<DeleteSale>> getAllDeleteSales() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('delete_sales');
+    return List.generate(maps.length, (i) => DeleteSale.fromMap(maps[i]));
+  }
+
+  Future<List<DeleteSaleItem>> getDeleteSaleItems(int deleteSaleId) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'delete_sales_items',
+      where: 'deleteSaleId = ?',
+      whereArgs: [deleteSaleId],
+    );
+    return List.generate(maps.length, (i) => DeleteSaleItem.fromMap(maps[i]));
+  }
+
+  Future<void> deleteSaleAndItems(int saleId, bool updateStock) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Get the sale and items before deleting
+      final sale = (await txn.query(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [saleId],
+      ))
+          .first;
+
+      final items = await txn.query(
+        'sales_items',
+        where: 'salesId = ?',
+        whereArgs: [saleId],
+      );
+
+      // Insert into delete_sales
+      final deleteSaleId = await txn.insert('delete_sales', {
+        ...sale,
+        'stockUpdated': updateStock ? 1 : 0,
+      });
+
+      // Insert items into delete_sales_items with modified keys
+      for (var item in items) {
+        final Map<String, dynamic> itemMap = Map<String, dynamic>.from(item);
+        // Remove the 'salesId' key since it is not in the new schema
+        itemMap.remove('salesId');
+        // Add the new key using the original sales item id
+        itemMap['deleteSaleItemId'] = item['id'];
+        // Set the foreign key for delete sales record
+        itemMap['deleteSaleId'] = deleteSaleId;
+        await txn.insert('delete_sales_items', itemMap);
+
+        // Update product quantity if needed
+        if (updateStock) {
+          final product = await txn.query(
+            'products',
+            where: 'name = ?',
+            whereArgs: [item['name']],
+          );
+
+          if (product.isNotEmpty) {
+            await txn.update(
+              'products',
+              {
+                'quantity': (product.first['quantity'] as num? ?? 0) +
+                    (item['quantity'] as num),
+                'updatedDate': DateTime.now().toIso8601String(),
+              },
+              where: 'name = ?',
+              whereArgs: [item['name']],
+            );
+          }
+        }
+      }
+
+      // Delete from original tables
+      await txn.delete(
+        'sales_items',
+        where: 'salesId = ?',
+        whereArgs: [saleId],
+      );
+      await txn.delete(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [saleId],
+      );
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getAllCategories() async {
+    final db = await database;
+    return await db.query('groups');
+  }
+
+  Future<List<Sales>> searchSalesByDateRange(
+      DateTime startDate, DateTime endDate) async {
+    final start =
+        DateTime(startDate.year, startDate.month, startDate.day, 0, 0, 0);
+    final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'sales',
+      where: 'date >= ? AND date <= ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+    );
+
+    return List.generate(maps.length, (i) {
+      return Sales.fromMap(maps[i]);
+    });
   }
 
   Future<int> insertStockUpdate(int productId, double quantityAdded) async {
@@ -180,17 +335,15 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getStockUpdatesByDateRange(
       DateTime start, DateTime end) async {
     final db = await instance.database;
-    // Format the start date to include the beginning of the day.
     final String startIso =
         DateFormat("yyyy-MM-dd").format(start) + "T00:00:00";
-    // Format the end date to include the end of the day.
     final String endIso = DateFormat("yyyy-MM-dd").format(end) + "T23:59:59";
 
     return await db.query(
       'stock_updates',
       where: 'updateDate BETWEEN ? AND ?',
       whereArgs: [startIso, endIso],
-      orderBy: 'updateDate DESC', // Optional: order by most recent first.
+      orderBy: 'updateDate DESC',
     );
   }
 
@@ -214,7 +367,7 @@ class DatabaseHelper {
     if (result.isNotEmpty) {
       return Product.fromMap(result.first);
     }
-    return null; // Return null if no product is found
+    return null;
   }
 
   Future<int> updatePosIdStatus(int id, String status) async {
@@ -262,8 +415,6 @@ class DatabaseHelper {
   Future<int> deleteUser(int id) async {
     try {
       final db = await instance.database;
-
-      // Check if user exists before deletion
       final List<Map<String, dynamic>> user = await db.query(
         'user_table',
         where: 'id = ?',
@@ -275,7 +426,6 @@ class DatabaseHelper {
         return 0;
       }
 
-      // Check if user is the last admin
       if (user.first['role'] == 'admin') {
         final List<Map<String, dynamic>> adminCount = await db.query(
           'user_table',
@@ -289,7 +439,6 @@ class DatabaseHelper {
         }
       }
 
-      // Proceed with deletion
       final result = await db.delete(
         'user_table',
         where: 'id = ?',
@@ -416,14 +565,13 @@ class DatabaseHelper {
 
   Future<List<Sales>> getSalesByDate(DateTime date) async {
     final db = await instance.database;
-    final String formattedDate =
-        date.toIso8601String().split('T').first; // Extract the date part
+    final String formattedDate = date.toIso8601String().split('T').first;
     print('Querying sales for date: $formattedDate');
 
     final List<Map<String, dynamic>> maps = await db.query(
       'sales',
       where: 'date LIKE ?',
-      whereArgs: ['$formattedDate%'], // Use LIKE to match the date part
+      whereArgs: ['$formattedDate%'],
     );
 
     print('Sales fetched: ${maps.length}');
@@ -436,13 +584,13 @@ class DatabaseHelper {
     print('Querying top sold item for date: $today');
 
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
-  SELECT name, SUM(quantity) as totalQuantity
-  FROM sales_items
-  WHERE salesId IN (SELECT id FROM sales WHERE date LIKE ?)
-  GROUP BY name
-  ORDER BY totalQuantity DESC
-  LIMIT 1
-  ''', ['$today%']); // Use LIKE to ensure date format matches
+      SELECT name, SUM(quantity) as totalQuantity
+      FROM sales_items
+      WHERE salesId IN (SELECT id FROM sales WHERE date LIKE ?)
+      GROUP BY name
+      ORDER BY totalQuantity DESC
+      LIMIT 1
+    ''', ['$today%']);
 
     if (maps.isNotEmpty) {
       final map = maps.first;
@@ -468,13 +616,13 @@ class DatabaseHelper {
     print('Querying least sold item for date: $today');
 
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
-  SELECT name, SUM(quantity) as totalQuantity
-  FROM sales_items
-  WHERE salesId IN (SELECT id FROM sales WHERE date LIKE ?)
-  GROUP BY name
-  ORDER BY totalQuantity ASC
-  LIMIT 1
-  ''', ['$today%']); // Use LIKE to ensure date format matches
+      SELECT name, SUM(quantity) as totalQuantity
+      FROM sales_items
+      WHERE salesId IN (SELECT id FROM sales WHERE date LIKE ?)
+      GROUP BY name
+      ORDER BY totalQuantity ASC
+      LIMIT 1
+    ''', ['$today%']);
 
     if (maps.isNotEmpty) {
       final map = maps.first;
@@ -584,7 +732,16 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
   }
 
+  Future<bool> _requestStoragePermission() async {
+    final status = await Permission.storage.request();
+    return status.isGranted;
+  }
+
   Future<bool> exportDatabase() async {
+    if (!(await _requestStoragePermission())) {
+      print('Storage permission not granted.');
+      return false;
+    }
     try {
       final dbPath = await getDatabasesPath();
       final path = join(dbPath, 'pos.db');
@@ -595,7 +752,11 @@ class DatabaseHelper {
         String? selectedDirectory =
             await FilePicker.platform.getDirectoryPath();
         if (selectedDirectory != null) {
-          final backupPath = join(selectedDirectory, 'pos_backup.db');
+          String formattedDate =
+              DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+          final backupPath =
+              join(selectedDirectory, 'pos_backup_$formattedDate.db');
+
           final backupFile = File(backupPath);
           await dbFile.copy(backupFile.path);
           print('Database exported to ${backupFile.path}');
@@ -613,10 +774,14 @@ class DatabaseHelper {
   }
 
   Future<bool> importDatabase() async {
+    if (!(await _requestStoragePermission())) {
+      print('Storage permission not granted.');
+      return false;
+    }
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['db'],
+        type: FileType.any,
+        allowMultiple: false,
       );
 
       if (result != null && result.files.single.path != null) {
@@ -628,19 +793,15 @@ class DatabaseHelper {
         final backupFile = File(backupPath);
 
         if (await backupFile.exists()) {
-          // Close the database before replacing it
           await closeDatabase();
 
-          // Delete the existing database file
           if (await dbFile.exists()) {
             await dbFile.delete();
           }
 
-          // Copy the backup file to the database path
           await backupFile.copy(dbFile.path);
           print('Database imported from ${backupFile.path}');
 
-          // Reopen the database
           await reopenDatabase(path);
           return true;
         } else {
@@ -658,28 +819,23 @@ class DatabaseHelper {
   Future<void> closeDatabase() async {
     final db = await instance.database;
     await db.close();
-    _database = null; // Reset the database instance
+    _database = null;
   }
 
   Future<void> reopenDatabase(String path) async {
     _database = await openDatabase(path);
   }
 
-  Future<List<Sales>> searchSalesByDateRange(
-      DateTime start, DateTime end) async {
-    final db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'sales',
-      where: 'date BETWEEN ? AND ?',
-      whereArgs: [start.toIso8601String(), end.toIso8601String()],
-    );
-    return List.generate(maps.length, (i) => Sales.fromMap(maps[i]));
-  }
-
   Future<List<Return>> getAllReturns() async {
     final db = await instance.database;
     final List<Map<String, dynamic>> maps = await db.query('returns');
     return List.generate(maps.length, (i) => Return.fromMap(maps[i]));
+  }
+
+  Future<List<SalesItem>> getAllSalesItems() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('sales_items');
+    return List.generate(maps.length, (i) => SalesItem.fromMap(maps[i]));
   }
 
   Future<List<Return>> getRefundsForSales(int salesId) async {

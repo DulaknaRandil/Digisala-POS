@@ -164,104 +164,181 @@ class _FooterState extends State<Footer> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      height: 75,
-      decoration: BoxDecoration(
-        color: const Color(0xFF313131),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFDBDBDB),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(HugeIcons.strokeRoundedLogin02,
-                  color: Colors.black),
-              onPressed: _showLogoutConfirmationDialog,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive sizes
+        final isSmallScreen = constraints.maxWidth < 800;
+        final isMediumScreen = constraints.maxWidth < 1200;
+
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 10 : 20,
+          ),
+          height: isSmallScreen ? 90 : 75,
+          decoration: BoxDecoration(
+            color: const Color(0xFF313131),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: const Color(0xFFDBDBDB),
+              width: 1,
             ),
           ),
-          const SizedBox(width: 16),
-          CircleAvatar(
-            radius: 32,
-            backgroundImage: AssetImage(widget.avatarUrl ?? ''),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _timeString,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+          // Constrain the inner Row to the max width so we can use spaceBetween
+          child: SizedBox(
+            width: constraints.maxWidth,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // LEFT GROUP: Logout, Avatar, Time & User Info
+                Row(
+                  children: [
+                    // Logout Button
+                    Container(
+                      margin: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 4 : 8),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          HugeIcons.strokeRoundedLogin02,
+                          color: Colors.black,
+                        ),
+                        onPressed: _showLogoutConfirmationDialog,
+                        iconSize: isSmallScreen ? 20 : 24,
+                      ),
+                    ),
+                    SizedBox(width: isSmallScreen ? 8 : 16),
+                    // Avatar
+                    CircleAvatar(
+                      radius: isSmallScreen ? 24 : 32,
+                      backgroundImage: AssetImage(widget.avatarUrl ?? ''),
+                    ),
+                    SizedBox(width: isSmallScreen ? 8 : 16),
+                    // Time and User Info
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _timeString,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize:
+                                isSmallScreen ? 18 : (isMediumScreen ? 20 : 24),
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          '${widget.username} (${widget.userRole})',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize:
+                                isSmallScreen ? 16 : (isMediumScreen ? 18 : 22),
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                '${widget.username}(${widget.userRole})', // Updated format
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+
+                // RIGHT GROUP: Action Buttons
+                Row(
+                  children: [
+                    _buildResponsiveActionButton(
+                      'Void Order',
+                      Colors.red,
+                      widget.onVoidOrder,
+                      isSmallScreen,
+                      isMediumScreen,
+                    ),
+                    _buildResponsiveActionButton(
+                      'End of Day',
+                      Colors.lightBlue,
+                      _showEndOfDayDialog,
+                      isSmallScreen,
+                      isMediumScreen,
+                    ),
+                    // Stock Button with Bubbles
+                    Stack(
+                      children: [
+                        _buildResponsiveActionButton(
+                          'Stock',
+                          Colors.teal,
+                          _showStockDialog,
+                          isSmallScreen,
+                          isMediumScreen,
+                        ),
+                        Positioned(
+                          right: 1,
+                          top: -5,
+                          child: _buildResponsiveStockBubble(
+                            lowStockCount,
+                            Colors.red,
+                            isSmallScreen,
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 6,
+                          child: _buildResponsiveStockBubble(
+                            mediumStockCount,
+                            Colors.yellow,
+                            isSmallScreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                    _buildResponsiveActionButton(
+                      'Payment',
+                      Colors.green,
+                      (widget.total > 0 ? widget.onPayment : null)
+                          as VoidCallback?,
+                      isSmallScreen,
+                      isMediumScreen,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
-          _buildActionButton('Void Order', Colors.red, widget.onVoidOrder),
-          _buildActionButton(
-              'End of Day', Colors.lightBlue, _showEndOfDayDialog),
-          Stack(
-            children: [
-              _buildActionButton('Stock ', Colors.teal, _showStockDialog),
-              Positioned(
-                right: 1,
-                top: -5,
-                child: _buildStockBubble(lowStockCount, Colors.red),
-              ),
-              Positioned(
-                right: 0, // Adjust this value to position the second bubble
-                bottom: 6,
-                child: _buildStockBubble(mediumStockCount, Colors.yellow),
-              ),
-            ],
-          ),
-          _buildActionButton('Payment', Colors.green,
-              widget.total > 0 ? widget.onPayment : null),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildActionButton(String text, Color color, onPressed) {
+  Widget _buildResponsiveActionButton(
+    String text,
+    Color color,
+    VoidCallback? onPressed,
+    bool isSmallScreen,
+    bool isMediumScreen,
+  ) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onPressed,
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          margin: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 4 : (isMediumScreen ? 6 : 8),
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 8 : (isMediumScreen ? 12 : 16),
+            vertical: isSmallScreen ? 6 : (isMediumScreen ? 8 : 10),
+          ),
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 24,
+              fontSize: isSmallScreen ? 16 : (isMediumScreen ? 20 : 24),
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
@@ -271,18 +348,22 @@ class _FooterState extends State<Footer> {
     );
   }
 
-  Widget _buildStockBubble(int count, Color color) {
+  Widget _buildResponsiveStockBubble(
+    int count,
+    Color color,
+    bool isSmallScreen,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
       ),
       child: Text(
         '$count',
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 12,
+          fontSize: isSmallScreen ? 10 : 12,
           fontWeight: FontWeight.bold,
         ),
       ),
