@@ -2,7 +2,7 @@ import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/suppplier_model.dart';
-import 'package:digisala_pos/widgets/product_update_confirmation_dialog.dart';
+import 'package:digisala_pos/widgets/admin_confirmation_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -33,6 +33,8 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
   List<Group> _groups = [];
   List<Supplier> _suppliers = []; // List of suppliers
   List<TextEditingController> _groupControllers = [];
+  int _currentPage = 1;
+  final int _rowsPerPage = 10;
 
   @override
   void initState() {
@@ -121,6 +123,7 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
         return nameMatches || idMatches || barcodeMatches;
       }).toList();
       _initializeControllers(_filteredProducts);
+      _currentPage = 1; // Reset to first page
     });
   }
 
@@ -193,7 +196,13 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-
+    // Calculate pagination indices
+    final startIndex = (_currentPage - 1) * _rowsPerPage;
+    final endIndex = startIndex + _rowsPerPage;
+    final paginatedProducts = _filteredProducts.sublist(
+      startIndex,
+      endIndex.clamp(0, _filteredProducts.length),
+    );
     return SingleChildScrollView(
       child: Dialog(
         backgroundColor: Colors.transparent,
@@ -222,19 +231,6 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                   ),
                   Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.picture_as_pdf,
-                            color: Colors.white),
-                        onPressed: () {
-                          // Implement PDF export functionality
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.print, color: Colors.white),
-                        onPressed: () {
-                          // Implement print functionality
-                        },
-                      ),
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.white),
                         onPressed: () {
@@ -316,294 +312,311 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
                                 style: TextStyle(color: Colors.white))),
                       ],
                       rows: List<DataRow>.generate(
-                        _filteredProducts.length,
-                        (index) => DataRow(
-                          cells: [
-                            DataCell(Text(
-                                _filteredProducts[index].id.toString(),
-                                style: TextStyle(color: Colors.white))),
-                            DataCell(
-                              TextFormField(
-                                controller: _barcodeControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
+                        paginatedProducts.length,
+                        (i) {
+                          final originalIndex = startIndex + i;
+                          return DataRow(
+                            cells: [
+                              DataCell(Text(paginatedProducts[i].id.toString(),
+                                  style: TextStyle(color: Colors.white))),
+                              DataCell(
+                                TextFormField(
+                                  controller:
+                                      _barcodeControllers[originalIndex],
+                                  style: TextStyle(color: Colors.white),
+                                  decoration:
+                                      InputDecoration(border: InputBorder.none),
+                                ),
                               ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _nameControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
+                              DataCell(
+                                TextFormField(
+                                  controller: _nameControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                ),
                               ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _secondaryNameControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
+                              DataCell(
+                                TextFormField(
+                                  controller:
+                                      _secondaryNameControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                ),
                               ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _expiryControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
-                                onTap: () async {
-                                  DateTime? pickedDate = await showDatePicker(
-                                    context: context,
-                                    initialDate: DateTime.now(),
-                                    firstDate: DateTime(2000),
-                                    lastDate: DateTime(2100),
-                                  );
-                                  if (pickedDate != null) {
-                                    setState(() {
-                                      _expiryControllers[index].text =
-                                          DateFormat('yyyy-MM-dd')
-                                              .format(pickedDate);
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                width: 150,
-                                child: RawAutocomplete<Group>(
-                                  textEditingController:
-                                      _groupControllers[index],
-                                  focusNode: FocusNode(),
-                                  optionsBuilder:
-                                      (TextEditingValue textEditingValue) {
-                                    if (textEditingValue.text.isEmpty) {
-                                      return const Iterable<Group>.empty();
+                              DataCell(
+                                TextFormField(
+                                  controller: _expiryControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                  onTap: () async {
+                                    DateTime? pickedDate = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (pickedDate != null) {
+                                      setState(() {
+                                        _expiryControllers[originalIndex].text =
+                                            DateFormat('yyyy-MM-dd')
+                                                .format(pickedDate);
+                                      });
                                     }
-                                    return _groups.where((Group group) {
-                                      return group.name.toLowerCase().contains(
-                                          textEditingValue.text.toLowerCase());
-                                    });
-                                  },
-                                  displayStringForOption: (Group group) =>
-                                      group.name,
-                                  onSelected: (Group selection) {
-                                    setState(() {
-                                      _groupControllers[index].text =
-                                          selection.name;
-                                    });
-                                  },
-                                  optionsViewBuilder:
-                                      (context, onSelected, options) {
-                                    return Align(
-                                      alignment: Alignment.topLeft,
-                                      child: Material(
-                                        elevation: 4.0,
-                                        child: Container(
-                                          width: 200,
-                                          color: const Color(0xFF020A1B),
-                                          child: ListView.builder(
-                                            padding: EdgeInsets.zero,
-                                            shrinkWrap: true,
-                                            itemCount: options.length,
-                                            itemBuilder: (BuildContext context,
-                                                int index) {
-                                              final Group option =
-                                                  options.elementAt(index);
-                                              return ListTile(
-                                                title: Text(option.name,
-                                                    style: const TextStyle(
-                                                        color: Colors.white)),
-                                                onTap: () {
-                                                  onSelected(option);
-                                                },
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  fieldViewBuilder: (context,
-                                      textEditingController,
-                                      focusNode,
-                                      onFieldSubmitted) {
-                                    return TextFormField(
-                                      controller: _groupControllers[index],
-                                      focusNode: focusNode,
-                                      style:
-                                          const TextStyle(color: Colors.white),
-                                      decoration: const InputDecoration(
-                                        border: InputBorder.none,
-                                        hintText: 'Type to search groups',
-                                        hintStyle:
-                                            TextStyle(color: Colors.grey),
-                                      ),
-                                      onChanged: (value) {
-                                        textEditingController.text = value;
-                                      },
-                                    );
                                   },
                                 ),
                               ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _quantityControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
-                              ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _buyingPriceControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _priceControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            DataCell(
-                              TextFormField(
-                                controller: _discountControllers[index],
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                width: 150,
-                                child: RawAutocomplete<Supplier>(
-                                  textEditingController:
-                                      _supplierControllers[index],
-                                  focusNode: FocusNode(),
-                                  optionsBuilder:
-                                      (TextEditingValue textEditingValue) {
-                                    if (textEditingValue.text.isEmpty) {
-                                      return const Iterable<Supplier>.empty();
-                                    }
-                                    return _suppliers
-                                        .where((Supplier supplier) {
-                                      return supplier.name
-                                          .toLowerCase()
-                                          .contains(textEditingValue.text
-                                              .toLowerCase());
-                                    });
-                                  },
-                                  displayStringForOption: (Supplier supplier) =>
-                                      supplier.name,
-                                  onSelected: (Supplier selection) {
-                                    setState(() {
-                                      _supplierControllers[index].text =
-                                          selection.name;
-                                    });
-                                  },
-                                  optionsViewBuilder:
-                                      (context, onSelected, options) {
-                                    return Align(
-                                      alignment: Alignment.topLeft,
-                                      child: Material(
-                                        elevation: 4.0,
-                                        child: Container(
-                                          width: 200,
-                                          color: const Color(0xFF020A1B),
-                                          child: ListView.builder(
-                                            padding: EdgeInsets.zero,
-                                            shrinkWrap: true,
-                                            itemCount: options.length,
-                                            itemBuilder: (BuildContext context,
-                                                int index) {
-                                              final Supplier option =
-                                                  options.elementAt(index);
-                                              return ListTile(
-                                                title: Text(option.name,
-                                                    style: const TextStyle(
-                                                        color: Colors.white)),
-                                                onTap: () {
-                                                  onSelected(option);
-                                                },
-                                              );
-                                            },
+                              DataCell(
+                                Container(
+                                  width: 150,
+                                  child: RawAutocomplete<Group>(
+                                    textEditingController:
+                                        _groupControllers[originalIndex],
+                                    focusNode: FocusNode(),
+                                    optionsBuilder:
+                                        (TextEditingValue textEditingValue) {
+                                      if (textEditingValue.text.isEmpty) {
+                                        return const Iterable<Group>.empty();
+                                      }
+                                      return _groups.where((Group group) {
+                                        return group.name
+                                            .toLowerCase()
+                                            .contains(textEditingValue.text
+                                                .toLowerCase());
+                                      });
+                                    },
+                                    displayStringForOption: (Group group) =>
+                                        group.name,
+                                    onSelected: (Group selection) {
+                                      setState(() {
+                                        _groupControllers[originalIndex].text =
+                                            selection.name;
+                                      });
+                                    },
+                                    optionsViewBuilder:
+                                        (context, onSelected, options) {
+                                      return Align(
+                                        alignment: Alignment.topLeft,
+                                        child: Material(
+                                          elevation: 4.0,
+                                          child: Container(
+                                            width: 200,
+                                            color: const Color(0xFF020A1B),
+                                            child: ListView.builder(
+                                              padding: EdgeInsets.zero,
+                                              shrinkWrap: true,
+                                              itemCount: options.length,
+                                              itemBuilder:
+                                                  (BuildContext context,
+                                                      int index) {
+                                                final Group option =
+                                                    options.elementAt(index);
+                                                return ListTile(
+                                                  title: Text(option.name,
+                                                      style: const TextStyle(
+                                                          color: Colors.white)),
+                                                  onTap: () {
+                                                    onSelected(option);
+                                                  },
+                                                );
+                                              },
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                  fieldViewBuilder: (context,
-                                      textEditingController,
-                                      focusNode,
-                                      onFieldSubmitted) {
-                                    return TextFormField(
-                                      controller: _supplierControllers[index],
-                                      focusNode: focusNode,
-                                      style:
-                                          const TextStyle(color: Colors.white),
-                                      decoration: const InputDecoration(
-                                        border: InputBorder.none,
-                                        hintText: 'Type to search suppliers',
-                                        hintStyle:
-                                            TextStyle(color: Colors.grey),
-                                      ),
-                                      onChanged: (value) {
-                                        textEditingController.text = value;
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              DropdownButton<String>(
-                                value: _selectedStatus[index],
-                                dropdownColor: Colors.grey[800],
-                                icon: const Icon(Icons.arrow_drop_down,
-                                    color: Colors.white),
-                                style: const TextStyle(color: Colors.white),
-                                items: _statusOptions.map((String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _selectedStatus[index] = newValue!;
-                                  });
-                                },
-                              ),
-                            ),
-                            DataCell(
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => _deleteProduct(index),
+                                      );
+                                    },
+                                    fieldViewBuilder: (context,
+                                        textEditingController,
+                                        focusNode,
+                                        onFieldSubmitted) {
+                                      return TextFormField(
+                                        controller:
+                                            _groupControllers[originalIndex],
+                                        focusNode: focusNode,
+                                        style: const TextStyle(
+                                            color: Colors.white),
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: 'Type to search groups',
+                                          hintStyle:
+                                              TextStyle(color: Colors.grey),
+                                        ),
+                                        onChanged: (value) {
+                                          textEditingController.text = value;
+                                        },
+                                      );
+                                    },
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              DataCell(
+                                TextFormField(
+                                  controller:
+                                      _quantityControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                ),
+                              ),
+                              DataCell(
+                                TextFormField(
+                                  controller:
+                                      _buyingPriceControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              DataCell(
+                                TextFormField(
+                                  controller: _priceControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              DataCell(
+                                TextFormField(
+                                  controller:
+                                      _discountControllers[originalIndex],
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                      border: InputBorder.none),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  width: 150,
+                                  child: RawAutocomplete<Supplier>(
+                                    textEditingController:
+                                        _supplierControllers[originalIndex],
+                                    focusNode: FocusNode(),
+                                    optionsBuilder:
+                                        (TextEditingValue textEditingValue) {
+                                      if (textEditingValue.text.isEmpty) {
+                                        return const Iterable<Supplier>.empty();
+                                      }
+                                      return _suppliers
+                                          .where((Supplier supplier) {
+                                        return supplier.name
+                                            .toLowerCase()
+                                            .contains(textEditingValue.text
+                                                .toLowerCase());
+                                      });
+                                    },
+                                    displayStringForOption:
+                                        (Supplier supplier) => supplier.name,
+                                    onSelected: (Supplier selection) {
+                                      setState(() {
+                                        _supplierControllers[originalIndex]
+                                            .text = selection.name;
+                                      });
+                                    },
+                                    optionsViewBuilder:
+                                        (context, onSelected, options) {
+                                      return Align(
+                                        alignment: Alignment.topLeft,
+                                        child: Material(
+                                          elevation: 4.0,
+                                          child: Container(
+                                            width: 200,
+                                            color: const Color(0xFF020A1B),
+                                            child: ListView.builder(
+                                              padding: EdgeInsets.zero,
+                                              shrinkWrap: true,
+                                              itemCount: options.length,
+                                              itemBuilder:
+                                                  (BuildContext context,
+                                                      int index) {
+                                                final Supplier option =
+                                                    options.elementAt(index);
+                                                return ListTile(
+                                                  title: Text(option.name,
+                                                      style: const TextStyle(
+                                                          color: Colors.white)),
+                                                  onTap: () {
+                                                    onSelected(option);
+                                                  },
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    fieldViewBuilder: (context,
+                                        textEditingController,
+                                        focusNode,
+                                        onFieldSubmitted) {
+                                      return TextFormField(
+                                        controller:
+                                            _supplierControllers[originalIndex],
+                                        focusNode: focusNode,
+                                        style: const TextStyle(
+                                            color: Colors.white),
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: 'Type to search suppliers',
+                                          hintStyle:
+                                              TextStyle(color: Colors.grey),
+                                        ),
+                                        onChanged: (value) {
+                                          textEditingController.text = value;
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                DropdownButton<String>(
+                                  value: _selectedStatus[originalIndex],
+                                  dropdownColor: Colors.grey[800],
+                                  icon: const Icon(Icons.arrow_drop_down,
+                                      color: Colors.white),
+                                  style: const TextStyle(color: Colors.white),
+                                  items: _statusOptions.map((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    );
+                                  }).toList(),
+                                  onChanged: (String? newValue) {
+                                    setState(() {
+                                      _selectedStatus[originalIndex] =
+                                          newValue!;
+                                    });
+                                  },
+                                ),
+                              ),
+                              DataCell(
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    IconButton(
+                                      icon:
+                                          Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () =>
+                                          _deleteProduct(originalIndex),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
+              _buildPagination(),
               ElevatedButton(
                 onPressed: _saveUpdates,
                 child: const Text('Save & Update'),
@@ -612,6 +625,30 @@ class _ProductUpdateFormState extends State<ProductUpdateForm> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPagination() {
+    final totalPages = (_filteredProducts.length / _rowsPerPage).ceil();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: Icon(Icons.chevron_left, color: Colors.white),
+          onPressed:
+              _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+        ),
+        Text(
+          'Page $_currentPage of $totalPages',
+          style: TextStyle(color: Colors.white),
+        ),
+        IconButton(
+          icon: Icon(Icons.chevron_right, color: Colors.white),
+          onPressed: _currentPage < totalPages
+              ? () => setState(() => _currentPage++)
+              : null,
+        ),
+      ],
     );
   }
 

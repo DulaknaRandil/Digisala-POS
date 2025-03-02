@@ -18,7 +18,7 @@ class SettingsPinDialog extends StatefulWidget {
 class _SettingsPinDialogState extends State<SettingsPinDialog>
     with SingleTickerProviderStateMixin {
   String currentPin = '';
-  String headerText = 'Enter Admin PIN';
+  String headerText = 'Enter Vendor PIN';
   bool isError = false;
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -65,7 +65,7 @@ class _SettingsPinDialogState extends State<SettingsPinDialog>
       setState(() {
         currentPin = currentPin.substring(0, currentPin.length - 1);
         if (isError) {
-          headerText = 'Enter Admin PIN';
+          headerText = 'Enter Vendor PIN';
           isError = false;
         }
       });
@@ -78,7 +78,7 @@ class _SettingsPinDialogState extends State<SettingsPinDialog>
       Navigator.of(context).pop(true);
     } else {
       setState(() {
-        headerText = 'Invalid Admin PIN';
+        headerText = 'Invalid Vendor PIN';
         isError = true;
         currentPin = '';
         _pinController.clear();

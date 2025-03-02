@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:digisala_pos/utils/printer_service.dart';
+import 'package:digisala_pos/widgets/drawer_amount_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
 import 'package:digisala_pos/models/sales_model.dart';
@@ -22,6 +25,9 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   int _salesCount = 0;
   double _totalAmount = 0.0;
   double _totalProfit = 0.0; // New variable for total profit
+  final PrinterService _printerService = PrinterService();
+  int _currentSalesPage = 1;
+  final int _rowsPerPage = 10;
   @override
   void initState() {
     super.initState();
@@ -29,26 +35,41 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   }
 
   double calculateProfit(
-      double price, double buyingPrice, double discount, double quantity) {
-    final discountedPrice = price - discount;
-    return (discountedPrice - buyingPrice) * quantity;
+    double price,
+    double buyingPrice,
+    double totalDiscount,
+    double originalQuantity,
+    double remainingQuantity,
+  ) {
+    final proportionalDiscount =
+        (remainingQuantity / originalQuantity) * totalDiscount;
+    return (price - buyingPrice) * remainingQuantity - proportionalDiscount;
   }
 
   Future<void> _loadTodaySales() async {
     final today = DateTime.now();
-    final String formattedDate = today.toIso8601String().split('T').first;
-    print('Querying sales for date: $formattedDate');
-
     final sales = await DatabaseHelper.instance.getSalesByDate(today);
-    print('Sales fetched: ${sales.length}');
 
-    // Calculate total profit
     double profit = 0.0;
+
     for (var sale in sales) {
       final items = await DatabaseHelper.instance.getSalesItems(sale.id!);
+
       for (var item in items) {
-        profit += calculateProfit(
-            item.price, item.buyingPrice, item.discount, item.quantity);
+        final refunds =
+            await DatabaseHelper.instance.getRefundsForSalesItem(item.id!);
+        final totalRefunded = refunds.fold(0.0, (sum, r) => sum + r.quantity);
+        final remainingQty = item.quantity - totalRefunded;
+
+        if (remainingQty > 0) {
+          profit += calculateProfit(
+            item.price,
+            item.buyingPrice,
+            item.discount,
+            item.quantity, // Original quantity
+            remainingQty, // Remaining after refunds
+          );
+        }
       }
     }
 
@@ -65,69 +86,474 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   }
 
   Future<Uint8List> _generatePdfContent() async {
-    final pdf = pw.Document();
+    double startDrawerAmount = 0;
+    double endDrawerAmount = 0;
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('End of Day Report', style: pw.TextStyle(fontSize: 24)),
-              pw.SizedBox(height: 20),
-              // Sales Table
-              pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  // Header
-                  pw.TableRow(
-                    children: [
-                      'ID',
-                      'Date',
-                      'Time',
-                      'Payment Method',
-                      'Payment',
-                      'Discount',
-                      'Total',
-                    ]
-                        .map((text) => pw.Container(
-                              padding: const pw.EdgeInsets.all(8),
-                              child: pw.Text(text),
-                            ))
-                        .toList(),
-                  ),
-                  // Data rows
-                  ..._salesList.map((sales) => pw.TableRow(
-                        children: [
-                          sales.id.toString(),
-                          '${sales.date.day}/${sales.date.month}/${sales.date.year}',
-                          sales.time,
-                          sales.paymentMethod,
-                          sales.subtotal.toString(),
-                          sales.discount.toString(),
-                          sales.total.toString(),
-                        ]
-                            .map((text) => pw.Container(
-                                  padding: const pw.EdgeInsets.all(8),
-                                  child: pw.Text(text),
-                                ))
-                            .toList(),
-                      )),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-
-              pw.Text('Summary', style: pw.TextStyle(fontSize: 18)),
-              pw.SizedBox(height: 2),
-              pw.Text('Sales Count: $_salesCount'),
-              pw.Text('Total Amount: $_totalAmount LKR'),
-              pw.Text('Total Profit: ${_totalProfit.toStringAsFixed(2)} LKR'),
-            ],
-          );
+    // Show drawer amount dialog
+    await showDialog(
+      context: context,
+      builder: (context) => DrawerAmountDialog(
+        totalAmount: _totalAmount,
+        onSubmit: (start, end) {
+          startDrawerAmount = start;
+          endDrawerAmount = end;
         },
       ),
     );
+
+    final pdf = pw.Document();
+    final drawerDifference = endDrawerAmount - startDrawerAmount;
+    final isTallied = (drawerDifference - _totalAmount).abs() < 0.01;
+    final drawerStatus = isTallied ? 'Tallied' : 'Not Tallied';
+
+    // Load receipt setup data
+    final receiptSetup = await _printerService.loadReceiptSetup();
+    final storeName = receiptSetup['storeName'] ?? 'Store Name';
+    final telephone = receiptSetup['telephone'] ?? 'N/A';
+    final address = receiptSetup['address'] ?? '';
+    final logoPath = receiptSetup['logoPath'];
+
+    // Load logo images
+    pw.MemoryImage? logoImage;
+    if (logoPath != null && await File(logoPath).exists()) {
+      final logoBytes = await File(logoPath).readAsBytes();
+      logoImage = pw.MemoryImage(logoBytes);
+    }
+
+    pw.MemoryImage? digisalaLogoImage;
+    var digisalaLogoPath = 'assets/logo.png';
+    if (await File(digisalaLogoPath).exists()) {
+      final logoBytes = await File(digisalaLogoPath).readAsBytes();
+      digisalaLogoImage = pw.MemoryImage(logoBytes);
+    }
+
+    final currentYear = DateTime.now().year;
+    final date = DateTime.now().toIso8601String().substring(0, 10);
+
+    // Fetch all sales items for the day
+    List<SalesItem> allSalesItems = [];
+    Map<String, Map<String, dynamic>> itemSummary = {};
+
+    for (var sale in _salesList) {
+      final items = await DatabaseHelper.instance.getSalesItems(sale.id!);
+      allSalesItems.addAll(items);
+
+      // Create summary for each unique item
+      for (var item in items) {
+        // Get total refunded quantity for this item
+        final refunds =
+            await DatabaseHelper.instance.getRefundsForSalesItem(item.id!);
+        final totalRefunded = refunds.fold(0.0, (sum, r) => sum + r.quantity);
+
+        // Calculate actual sold quantity and proportional values
+        final remainingQty = item.quantity - totalRefunded;
+        final unitPrice = item.price;
+        final proportionalDiscount = totalRefunded > 0
+            ? (remainingQty / item.quantity) * item.discount
+            : item.discount;
+        if (itemSummary.containsKey(item.name)) {
+          itemSummary[item.name]!['quantity'] += item.quantity;
+          itemSummary[item.name]!['returnQty'] += totalRefunded;
+          itemSummary[item.name]!['remainingQty'] += remainingQty;
+          itemSummary[item.name]!['total'] += remainingQty * unitPrice;
+          itemSummary[item.name]!['discount'] += proportionalDiscount;
+        } else {
+          itemSummary[item.name] = {
+            'quantity': item.quantity,
+            'returnQty': totalRefunded,
+            'remainingQty': remainingQty,
+            'total': remainingQty * unitPrice,
+            'discount': proportionalDiscount,
+            'buyingPrice': item.buyingPrice,
+          };
+        }
+      }
+    }
+
+    // Convert summary to a list for easier sorting and display
+    List<Map<String, dynamic>> itemsList = [];
+    itemSummary.forEach((name, data) {
+      itemsList.add({
+        'name': name,
+        'totalQty': data['quantity'],
+        'returnQty': data['returnQty'],
+        'remainingQty': data['remainingQty'],
+        'total': data['total'],
+        'discount': data['discount'],
+        'finalPrice': data['total'] - data['discount'],
+        'profit': (data['total'] - data['discount']) -
+            (data['buyingPrice'] * data['remainingQty']),
+      });
+    });
+
+    // Sort items by quantity (descending)
+    itemsList.sort((a, b) => b['quantity'].compareTo(a['quantity']));
+
+    // Calculate items per page
+    final salesItemsPerPage = 20;
+    final salesTotalPages = (_salesList.length / salesItemsPerPage).ceil();
+
+    // Generate sales pages
+    for (var pageNum = 0; pageNum < salesTotalPages; pageNum++) {
+      final startIndex = pageNum * salesItemsPerPage;
+      final endIndex = (startIndex + salesItemsPerPage < _salesList.length)
+          ? startIndex + salesItemsPerPage
+          : _salesList.length;
+
+      final pageItems = _salesList.sublist(startIndex, endIndex);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header Section
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    if (logoImage != null)
+                      pw.Container(
+                        width: 80,
+                        height: 80,
+                        child: pw.Image(logoImage),
+                      )
+                    else
+                      pw.Container(width: 80, height: 80),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(storeName,
+                            style: pw.TextStyle(
+                                fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Date: $date',
+                            style: pw.TextStyle(fontSize: 12)),
+                        pw.Text('Tel: $telephone',
+                            style: pw.TextStyle(fontSize: 12)),
+                        if (address.isNotEmpty)
+                          pw.Text('Address: $address',
+                              style: pw.TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text('End of Day Report',
+                    style: pw.TextStyle(
+                        fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+
+                // Sales Table
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      pw.Table(
+                        border: pw.TableBorder.all(),
+                        columnWidths: {
+                          0: const pw.FlexColumnWidth(1),
+                          1: const pw.FlexColumnWidth(2),
+                          2: const pw.FlexColumnWidth(1.5),
+                          3: const pw.FlexColumnWidth(1.5),
+                          4: const pw.FlexColumnWidth(1.5),
+                          5: const pw.FlexColumnWidth(1.5),
+                          6: const pw.FlexColumnWidth(1.5),
+                        },
+                        children: [
+                          // Table header
+                          pw.TableRow(
+                            decoration:
+                                pw.BoxDecoration(color: PdfColors.grey300),
+                            children: [
+                              'ID',
+                              'Date',
+                              'Time',
+                              'Method',
+                              'Payment',
+                              'Discount',
+                              'Total',
+                            ]
+                                .map((text) => pw.Padding(
+                                      padding: const pw.EdgeInsets.all(6),
+                                      child: pw.Text(text,
+                                          style: pw.TextStyle(
+                                              fontWeight: pw.FontWeight.bold)),
+                                    ))
+                                .toList(),
+                          ),
+                          // Data rows
+                          ...pageItems.map((sales) => pw.TableRow(
+                                children: [
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(sales.id.toString()),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        '${sales.date.day}/${sales.date.month}/${sales.date.year}'),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(sales.time),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(sales.paymentMethod),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(sales.subtotal.toString()),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(sales.discount.toString()),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(sales.total.toString()),
+                                  ),
+                                ],
+                              )),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Page information
+                pw.Container(
+                  alignment: pw.Alignment.centerRight,
+                  margin: const pw.EdgeInsets.only(top: 10),
+                  child: pw.Text(
+                    'Sales Report - Page ${pageNum + 1} of $salesTotalPages',
+                    style: pw.TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // Item-wise summary pages
+    final itemsPerPage = 20;
+    final itemsTotalPages = (itemsList.length / itemsPerPage).ceil();
+
+    for (var pageNum = 0; pageNum < itemsTotalPages; pageNum++) {
+      final startIndex = pageNum * itemsPerPage;
+      final endIndex = (startIndex + itemsPerPage < itemsList.length)
+          ? startIndex + itemsPerPage
+          : itemsList.length;
+
+      final pageItems = itemsList.sublist(startIndex, endIndex);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header Section
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    if (logoImage != null)
+                      pw.Container(
+                        width: 80,
+                        height: 80,
+                        child: pw.Image(logoImage),
+                      )
+                    else
+                      pw.Container(width: 80, height: 80),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(storeName,
+                            style: pw.TextStyle(
+                                fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Date: $date',
+                            style: pw.TextStyle(fontSize: 12)),
+                        pw.Text('Tel: $telephone',
+                            style: pw.TextStyle(fontSize: 12)),
+                        if (address.isNotEmpty)
+                          pw.Text('Address: $address',
+                              style: pw.TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text('Items-wise Sales Summary',
+                    style: pw.TextStyle(
+                        fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+
+                // Items Table
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      pw.Table(
+                        border: pw.TableBorder.all(),
+                        columnWidths: {
+                          0: const pw.FlexColumnWidth(2.2),
+                          1: const pw.FlexColumnWidth(1.2),
+                          2: const pw.FlexColumnWidth(1.2),
+                          3: const pw.FlexColumnWidth(1.2),
+                          4: const pw.FlexColumnWidth(1.3),
+                          5: const pw.FlexColumnWidth(1.3),
+                          6: const pw.FlexColumnWidth(1.3),
+                          7: const pw.FlexColumnWidth(1.3),
+                        },
+                        children: [
+                          // Table header
+                          pw.TableRow(
+                            decoration:
+                                pw.BoxDecoration(color: PdfColors.grey300),
+                            children: [
+                              'Item Name',
+                              'Total Qty',
+                              'Return Qty',
+                              'Net Qty',
+                              'Total Sales',
+                              'Discount',
+                              'Net Sales',
+                              'Profit',
+                            ]
+                                .map((text) => pw.Padding(
+                                      padding: const pw.EdgeInsets.all(6),
+                                      child: pw.Text(text,
+                                          style: pw.TextStyle(
+                                              fontWeight: pw.FontWeight.bold)),
+                                    ))
+                                .toList(),
+                          ),
+                          // Data rows
+                          ...pageItems.map((item) => pw.TableRow(
+                                children: [
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(item['name']),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        item['totalQty'].toStringAsFixed(2)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        item['returnQty'].toStringAsFixed(2)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(item['remainingQty']
+                                        .toStringAsFixed(2)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        item['total'].toStringAsFixed(2)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        item['discount'].toStringAsFixed(2)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        item['finalPrice'].toStringAsFixed(2)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        item['profit'].toStringAsFixed(2)),
+                                  ),
+                                ],
+                              )),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Summary on last items page
+                if (pageNum == itemsTotalPages - 1)
+                  pw.Container(
+                    margin: const pw.EdgeInsets.only(top: 20),
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(),
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(8)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('End of Day Summary',
+                            style: pw.TextStyle(
+                                fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                        pw.SizedBox(height: 10),
+                        pw.Text('Sales Count: $_salesCount'),
+                        pw.Text(
+                            'Total Profit: ${_totalProfit.toStringAsFixed(2)} LKR'),
+                        pw.Text(
+                            'Start Day Drawer Amount: $startDrawerAmount LKR'),
+                        pw.Text('End Day Drawer Amount: $endDrawerAmount LKR'),
+                        pw.Text('Total Sales Amount: $_totalAmount LKR'),
+                        pw.Text('Status: $drawerStatus',
+                            style: pw.TextStyle(
+                                color:
+                                    isTallied ? PdfColors.green : PdfColors.red,
+                                fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+
+                // Footer
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(top: 20),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (digisalaLogoImage != null)
+                        pw.Container(
+                          height: 30,
+                          child: pw.Image(digisalaLogoImage),
+                        ),
+                      pw.Text(
+                        '© $currentYear Digisala POS. All rights reserved',
+                        style: pw.TextStyle(
+                            fontSize: 10, color: PdfColors.grey700),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Page number
+                pw.Container(
+                  alignment: pw.Alignment.centerRight,
+                  margin: const pw.EdgeInsets.only(top: 10),
+                  child: pw.Text(
+                    'Items Report - Page ${pageNum + 1} of $itemsTotalPages',
+                    style: pw.TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
 
     return pdf.save();
   }
@@ -172,74 +598,77 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                           style: TextStyle(color: Colors.white, fontSize: 18),
                         ),
                         const SizedBox(height: 16),
-                        SizedBox(
-                          width: 800,
-                          height: 600,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
+                        Padding(
+                          padding: const EdgeInsets.only(left: 200),
+                          child: SizedBox(
+                            width: 800,
+                            height: 600,
                             child: SingleChildScrollView(
-                              scrollDirection: Axis.vertical,
-                              child: DataTable(
-                                headingRowColor: MaterialStateProperty.all(
-                                    const Color.fromARGB(56, 131, 131, 128)),
-                                dataRowColor:
-                                    MaterialStateProperty.resolveWith<Color>(
-                                  (Set<MaterialState> states) {
-                                    if (states
-                                        .contains(MaterialState.selected)) {
-                                      return Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withOpacity(0.08);
-                                    }
-                                    return Colors.white.withAlpha(8);
-                                  },
+                              scrollDirection: Axis.horizontal,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: DataTable(
+                                  headingRowColor: WidgetStateProperty.all(
+                                      const Color.fromARGB(56, 131, 131, 128)),
+                                  dataRowColor:
+                                      WidgetStateProperty.resolveWith<Color>(
+                                    (Set<WidgetState> states) {
+                                      if (states
+                                          .contains(WidgetState.selected)) {
+                                        return Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.08);
+                                      }
+                                      return Colors.white.withAlpha(8);
+                                    },
+                                  ),
+                                  columns: const [
+                                    DataColumn(
+                                        label: Text('Name',
+                                            style: TextStyle(
+                                                color: Colors.white))),
+                                    DataColumn(
+                                        label: Text('Quantity',
+                                            style: TextStyle(
+                                                color: Colors.white))),
+                                    DataColumn(
+                                        label: Text('Total',
+                                            style: TextStyle(
+                                                color: Colors.white))),
+                                    DataColumn(
+                                        label: Text('Discount',
+                                            style: TextStyle(
+                                                color: Colors.white))),
+                                    DataColumn(
+                                        label: Text('Final Price',
+                                            style: TextStyle(
+                                                color: Colors.white))),
+                                  ],
+                                  rows: _salesItems.map((item) {
+                                    final double finalPrice =
+                                        item.total - item.discount;
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(Text(item.name,
+                                            style: const TextStyle(
+                                                color: Colors.white))),
+                                        DataCell(Text('${item.quantity}',
+                                            style: const TextStyle(
+                                                color: Colors.white))),
+                                        DataCell(Text('${item.total}',
+                                            style: const TextStyle(
+                                                color: Colors.white))),
+                                        DataCell(Text('${item.discount}',
+                                            style: const TextStyle(
+                                                color: Colors.white))),
+                                        DataCell(Text('${finalPrice}',
+                                            style: const TextStyle(
+                                                color: Colors.white))),
+                                      ],
+                                    );
+                                  }).toList(),
                                 ),
-                                columns: const [
-                                  DataColumn(
-                                      label: Text('Name',
-                                          style:
-                                              TextStyle(color: Colors.white))),
-                                  DataColumn(
-                                      label: Text('Quantity',
-                                          style:
-                                              TextStyle(color: Colors.white))),
-                                  DataColumn(
-                                      label: Text('Total',
-                                          style:
-                                              TextStyle(color: Colors.white))),
-                                  DataColumn(
-                                      label: Text('Discount',
-                                          style:
-                                              TextStyle(color: Colors.white))),
-                                  DataColumn(
-                                      label: Text('Final Price',
-                                          style:
-                                              TextStyle(color: Colors.white))),
-                                ],
-                                rows: _salesItems.map((item) {
-                                  final double finalPrice =
-                                      item.total - item.discount;
-                                  return DataRow(
-                                    cells: [
-                                      DataCell(Text(item.name,
-                                          style: const TextStyle(
-                                              color: Colors.white))),
-                                      DataCell(Text('${item.quantity}',
-                                          style: const TextStyle(
-                                              color: Colors.white))),
-                                      DataCell(Text('${item.total}',
-                                          style: const TextStyle(
-                                              color: Colors.white))),
-                                      DataCell(Text('${item.discount}',
-                                          style: const TextStyle(
-                                              color: Colors.white))),
-                                      DataCell(Text('${finalPrice}',
-                                          style: const TextStyle(
-                                              color: Colors.white))),
-                                    ],
-                                  );
-                                }).toList(),
                               ),
                             ),
                           ),
@@ -248,7 +677,7 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                     ),
                   ),
                   Positioned(
-                    top: 0,
+                    top: 10,
                     right: 10,
                     child: IconButton(
                         icon: const Icon(Icons.close, color: Colors.white),
@@ -411,6 +840,7 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                       height: 10,
                     ),
                     _buildSalesTable(),
+                    _buildSalesPagination(),
                   ],
                 ),
               ),
@@ -547,22 +977,29 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   }
 
   Widget _buildSalesTable() {
+    final startIndex = (_currentSalesPage - 1) * _rowsPerPage;
+    final endIndex = startIndex + _rowsPerPage;
+    final paginatedSales = _salesList.sublist(
+      startIndex,
+      endIndex.clamp(0, _salesList.length),
+    );
+
     return SizedBox(
-      height: 250, // Adjust height to show rows
+      height: 390, // Adjust height to show rows
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: SingleChildScrollView(
           scrollDirection: Axis.vertical,
           child: DataTable(
-            headingRowColor: MaterialStateProperty.all(
+            headingRowColor: WidgetStateProperty.all(
                 const Color.fromARGB(56, 131, 131, 128)),
-            dataRowColor: MaterialStateProperty.resolveWith<Color>(
-              (Set<MaterialState> states) {
-                if (states.contains(MaterialState.selected)) {
+            dataRowColor: WidgetStateProperty.resolveWith<Color>(
+              (Set<WidgetState> states) {
+                if (states.contains(WidgetState.selected)) {
                   return Theme.of(context)
                       .colorScheme
                       .primary
-                      .withOpacity(0.08);
+                      .withValues(alpha: 0.08);
                 }
                 return Colors.white.withAlpha(8);
               },
@@ -585,7 +1022,7 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
               DataColumn(
                   label: Text('Total', style: TextStyle(color: Colors.white))),
             ],
-            rows: _salesList.map((sales) {
+            rows: paginatedSales.map((sales) {
               return DataRow(
                 color: MaterialStateProperty.resolveWith<Color>(
                   (Set<MaterialState> states) {
@@ -626,6 +1063,31 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSalesPagination() {
+    final totalPages = (_salesList.length / _rowsPerPage).ceil();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left, color: Colors.white),
+          onPressed: _currentSalesPage > 1
+              ? () => setState(() => _currentSalesPage--)
+              : null,
+        ),
+        Text(
+          'Page $_currentSalesPage of $totalPages',
+          style: const TextStyle(color: Colors.white),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right, color: Colors.white),
+          onPressed: _currentSalesPage < totalPages
+              ? () => setState(() => _currentSalesPage++)
+              : null,
+        ),
+      ],
     );
   }
 }

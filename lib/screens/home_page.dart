@@ -658,7 +658,9 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return UserAccessControlDialog();
+        return UserAccessControlDialog(
+          searchBarFocusNode: _searchBarFocusNode,
+        );
       },
     );
   }

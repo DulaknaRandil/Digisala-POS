@@ -6,6 +6,9 @@ class Return {
   final double total;
   final String returnDate;
   final double quantity;
+  final bool stockUpdated;
+  final int productId; // Add this
+  final String supplierName; // Add this
 
   Return({
     this.id,
@@ -15,6 +18,9 @@ class Return {
     required this.total,
     required this.returnDate,
     required this.quantity,
+    required this.stockUpdated,
+    required this.productId, // Add this
+    required this.supplierName, // Add this
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +32,9 @@ class Return {
       'total': total,
       'returnDate': returnDate,
       'quantity': quantity,
+      'stockUpdated': stockUpdated ? 1 : 0,
+      'productId': productId, // Add this
+      'supplierName': supplierName, // Add this
     };
   }
 
@@ -38,6 +47,9 @@ class Return {
       total: map['total'],
       returnDate: map['returnDate'],
       quantity: map['quantity'],
+      stockUpdated: map['stockUpdated'] == 1,
+      productId: map['productId'], // Add this
+      supplierName: map['supplierName'], // Add this
     );
   }
 }

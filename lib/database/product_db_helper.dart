@@ -102,6 +102,9 @@ class DatabaseHelper {
         total REAL NOT NULL,
         returnDate TEXT NOT NULL,
         quantity REAL NOT NULL,
+        stockUpdated INTEGER NOT NULL,
+        productId INTEGER NOT NULL,      
+        supplierName TEXT NOT NULL, 
         FOREIGN KEY (salesItemId) REFERENCES sales_items (id)
       )
     ''');
@@ -289,6 +292,50 @@ class DatabaseHelper {
     });
   }
 
+  // Add to your DatabaseHelper class
+  Future<List<Return>> getAllReturns({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? searchQuery,
+  }) async {
+    final db = await instance.database;
+    String where = '1=1';
+    List<Object?> whereArgs = [];
+
+    if (startDate != null && endDate != null) {
+      where += ' AND returnDate BETWEEN ? AND ?';
+      whereArgs.addAll([
+        startDate.toIso8601String(),
+        endDate.add(const Duration(days: 1)).toIso8601String(),
+      ]);
+    }
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      where += '''
+      AND (products.name LIKE ? 
+        OR suppliers.name LIKE ? 
+        OR CAST(products.id AS TEXT) LIKE ?)
+    ''';
+      String searchPattern = '%$searchQuery%';
+      whereArgs.addAll([searchPattern, searchPattern, searchPattern]);
+    }
+
+    // In DatabaseHelper.getAllReturns
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+  SELECT 
+    returns.*,
+    products.id as productId,
+    suppliers.name as supplierName
+  FROM returns
+  INNER JOIN products ON returns.name = products.name
+  INNER JOIN suppliers ON products.supplierId = suppliers.id
+  WHERE $where
+  ORDER BY returnDate DESC
+''', whereArgs);
+
+    return List.generate(maps.length, (i) => Return.fromMap(maps[i]));
+  }
+
   Future<List<Map<String, dynamic>>> getAllCategories() async {
     final db = await database;
     return await db.query('groups');
@@ -319,6 +366,16 @@ class DatabaseHelper {
       'quantityAdded': quantityAdded,
       'updateDate': DateTime.now().toIso8601String(),
     });
+  }
+
+  Future<List<Return>> getRefundsForSalesItem(int salesItemId) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'returns',
+      where: 'salesItemId = ?',
+      whereArgs: [salesItemId],
+    );
+    return List.generate(maps.length, (i) => Return.fromMap(maps[i]));
   }
 
   Future<List<Map<String, dynamic>>> getStockUpdatesByDate(
@@ -824,12 +881,6 @@ class DatabaseHelper {
 
   Future<void> reopenDatabase(String path) async {
     _database = await openDatabase(path);
-  }
-
-  Future<List<Return>> getAllReturns() async {
-    final db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.query('returns');
-    return List.generate(maps.length, (i) => Return.fromMap(maps[i]));
   }
 
   Future<List<SalesItem>> getAllSalesItems() async {

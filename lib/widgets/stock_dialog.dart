@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:excel/excel.dart' as ex;
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class StockDialog extends StatefulWidget {
   final FocusNode searchBarFocusNode;
@@ -92,16 +93,36 @@ class _StockDialogState extends State<StockDialog> {
     });
   }
 
+  // ✅ Helper Function: Request Storage Permission
+  Future<bool> _requestStoragePermission() async {
+    var status = await Permission.storage.status;
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
+    }
+    return status.isGranted;
+  }
+
+// ✅ Helper Function: Show Messages
+  void _showMessage(String message, {bool isError = false}) {
+    print(isError ? "❌ Error: $message" : "✅ Success: $message");
+  }
+
   Future<void> _exportStockToExcel() async {
     try {
-      // Fetch all products.
+      // Step 1: Request Storage Permission
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        _showMessage('Storage permission denied', isError: true);
+        return;
+      }
+
+      // Step 2: Fetch All Products & Suppliers
       final products = await DatabaseHelper.instance.getAllProducts();
-      // Fetch all suppliers.
       final suppliers = await DatabaseHelper.instance.getAllSuppliers();
 
-      // Create a new Excel document.
+      // Step 3: Create Excel Document
       var excel = ex.Excel.createExcel();
-      ex.Sheet sheetObject = excel['Products'];
+      ex.Sheet sheetObject = excel['Stock'];
 
       // Header row with supplier name.
       List<ex.CellValue> headerRow = [
@@ -122,7 +143,7 @@ class _StockDialogState extends State<StockDialog> {
       // Append a row for each product.
       for (var product in products) {
         // Look up the supplier name.
-        String supplierName = '';
+        String supplierName = 'Unknown';
         try {
           final supplier = suppliers.firstWhere(
               (s) => s.id == product.supplierId,
@@ -131,6 +152,7 @@ class _StockDialogState extends State<StockDialog> {
         } catch (e) {
           supplierName = 'Unknown';
         }
+
         List<ex.CellValue> row = [
           ex.TextCellValue(product.barcode),
           ex.TextCellValue(product.name),
@@ -149,19 +171,21 @@ class _StockDialogState extends State<StockDialog> {
         sheetObject.appendRow(row);
       }
 
-      // Save the Excel file in the app's documents directory.
-      final directory = await getApplicationDocumentsDirectory();
-      final outputFile = File('${directory.path}/products_export.xlsx');
+      // Step 4: Let User Choose Directory
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      if (selectedDirectory == null) {
+        _showMessage('Export cancelled by user', isError: true);
+        return;
+      }
+
+      // Step 5: Save the File
+      final outputFile = File('$selectedDirectory/stock_export.xlsx');
       await outputFile.writeAsBytes(excel.encode()!);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Products exported to ${outputFile.path}')),
-      );
+      _showMessage('Stock exported to ${outputFile.path}', isError: false);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error exporting products: $e')),
-      );
-      print('Error exporting products: $e');
+      _showMessage('Error exporting stock: ${e.toString()}', isError: true);
+      print('Error exporting stock: $e');
     }
   }
 
@@ -429,29 +453,32 @@ class _StockDialogState extends State<StockDialog> {
                   'Total Items: ${allFilteredProducts.length}',
                   style: const TextStyle(color: Colors.white),
                 ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: List.generate(
-                      totalPages,
-                      (index) => TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _currentPage = index;
-                            _displayedProducts = _filterProducts();
-                          });
-                        },
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            color: _currentPage == index
-                                ? Colors.lightBlue
-                                : Colors.white,
-                          ),
-                        ),
-                      ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, color: Colors.white),
+                      onPressed: _currentPage > 0
+                          ? () => setState(() {
+                                _currentPage--;
+                                _displayedProducts = _filterProducts();
+                              })
+                          : null,
                     ),
-                  ),
+                    Text(
+                      'Page ${_currentPage + 1} of $totalPages',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    IconButton(
+                      icon:
+                          const Icon(Icons.chevron_right, color: Colors.white),
+                      onPressed: _currentPage < totalPages - 1
+                          ? () => setState(() {
+                                _currentPage++;
+                                _displayedProducts = _filterProducts();
+                              })
+                          : null,
+                    ),
+                  ],
                 ),
                 ElevatedButton(
                   onPressed: () {

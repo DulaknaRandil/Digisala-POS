@@ -7,14 +7,14 @@ class SearchBar extends StatefulWidget {
   final Function(Product) onAddProduct;
   final String? initialValue;
   final String? hintText;
-  final FocusNode? focusNode; // Add focusNode parameter
+  final FocusNode? focusNode;
 
   const SearchBar({
     Key? key,
     required this.onAddProduct,
     this.initialValue,
     this.hintText = 'Search by barcode, name or ID',
-    this.focusNode, // Initialize focusNode
+    this.focusNode,
   }) : super(key: key);
 
   @override
@@ -31,12 +31,16 @@ class _SearchBarState extends State<SearchBar> {
   String? _lastProcessedBarcode;
   bool _isProcessingBarcode = false;
 
+  // State variable to track the selected search type.
+  String _selectedSearchType = 'Barcode';
+
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
-    _focusNode = widget.focusNode ??
-        FocusNode(); // Use provided focusNode or create a new one
+    _focusNode = widget.focusNode ?? FocusNode();
+
+    // Set initial focus to the search bar after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
@@ -46,67 +50,67 @@ class _SearchBarState extends State<SearchBar> {
   void dispose() {
     _hideOverlay();
     if (widget.focusNode == null) {
-      _focusNode.dispose(); // Dispose only if it was created here
+      _focusNode.dispose();
     }
     _controller.dispose();
     super.dispose();
   }
 
   void _showOverlay() {
-    if (_isProcessingBarcode)
-      return; // Prevent showing overlay during barcode processing
+    if (_isProcessingBarcode) return;
     _hideOverlay();
     final overlay = Overlay.of(context);
     _overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        width: 611,
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          offset: const Offset(0, 65),
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _searchResults.length,
-                itemBuilder: (context, index) {
-                  final product = _searchResults[index];
-                  final isHighlighted = index == _highlightedIndex;
-                  return Container(
-                    color: isHighlighted ? Colors.blue.withOpacity(0.2) : null,
-                    child: ListTile(
-                      title: Text(product.name),
-                      subtitle: Text(
-                          'ID: ${product.id}, Barcode: ${product.barcode}'),
-                      onTap: () {
-                        _selectProduct(product);
-                      },
-                    ),
-                  );
-                },
-              ),
+      builder: (context) => _buildOverlay(),
+    );
+    overlay.insert(_overlayEntry!);
+  }
+
+  // Extract overlay building to a separate method
+  Widget _buildOverlay() {
+    return Positioned(
+      width: 611,
+      child: CompositedTransformFollower(
+        link: _layerLink,
+        showWhenUnlinked: false,
+        offset: const Offset(0, 65),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _searchResults.length,
+              itemBuilder: (context, index) {
+                final product = _searchResults[index];
+                final isHighlighted = index == _highlightedIndex;
+                return Container(
+                  color: isHighlighted ? Colors.blue.withOpacity(0.2) : null,
+                  child: ListTile(
+                    title: Text(product.name),
+                    subtitle:
+                        Text('ID: ${product.id}, Barcode: ${product.barcode}'),
+                    onTap: () {
+                      _selectProduct(product);
+                    },
+                  ),
+                );
+              },
             ),
           ),
         ),
       ),
     );
-    overlay.insert(_overlayEntry!);
   }
 
   void _hideOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
-  }
-
-  bool _isBarcodeMatch(String value, Product product) {
-    return product.barcode == value && value.length >= 5;
   }
 
   void _handleSearch(String value) async {
@@ -120,7 +124,7 @@ class _SearchBarState extends State<SearchBar> {
       return;
     }
 
-    // Prevent processing if this barcode was just processed
+    // Prevent processing if this barcode was just processed.
     if (value == _lastProcessedBarcode) {
       return;
     }
@@ -128,9 +132,54 @@ class _SearchBarState extends State<SearchBar> {
     try {
       final results = await DatabaseHelper.instance.searchProducts(value);
 
-      // Filter out products with status 'deactivate' or quantity 0
-      final filteredResults = results.where((product) {
+      // Filter out inactive products or those with zero quantity.
+      final initialFiltered = results.where((product) {
         return product.status != 'Inactive' && product.quantity > 0;
+      }).toList();
+
+      if (_selectedSearchType == 'Barcode') {
+        // Find all exact matches for the barcode.
+        final matchingProducts = initialFiltered
+            .where((product) => product.barcode == value)
+            .toList();
+
+        if (matchingProducts.isEmpty) {
+          // No exact match found: clear suggestions.
+          setState(() {
+            _searchResults = [];
+            _highlightedIndex = -1;
+          });
+          _hideOverlay();
+        } else if (matchingProducts.length == 1) {
+          // Only one match, auto-select it.
+          _isProcessingBarcode = true;
+          _lastProcessedBarcode = value;
+          _addProduct(matchingProducts.first);
+          _controller.clear();
+          _focusNode.requestFocus();
+          _isProcessingBarcode = false;
+          _hideOverlay();
+          _lastProcessedBarcode = null;
+        } else {
+          // Multiple matches exist; show them in the overlay for manual selection.
+          setState(() {
+            _searchResults = matchingProducts;
+            _highlightedIndex = 0;
+            _lastProcessedBarcode = null;
+          });
+          _showOverlay();
+        }
+        return;
+      }
+
+      // For Name or ID search types, filter results accordingly.
+      final filteredResults = initialFiltered.where((product) {
+        if (_selectedSearchType == 'Name') {
+          return product.name.toLowerCase().contains(value.toLowerCase());
+        } else if (_selectedSearchType == 'ID') {
+          return product.id.toString().contains(value);
+        }
+        return false;
       }).toList();
 
       if (filteredResults.isEmpty) {
@@ -138,22 +187,6 @@ class _SearchBarState extends State<SearchBar> {
           _searchResults = [];
           _highlightedIndex = -1;
         });
-        _hideOverlay();
-        return;
-      }
-
-      // Check if this is a barcode scan
-      if (filteredResults.length == 1 &&
-          _isBarcodeMatch(value, filteredResults[0])) {
-        _isProcessingBarcode = true;
-        _lastProcessedBarcode = value;
-        _addProduct(filteredResults[0]);
-
-        // Clear text and request focus immediately
-        _controller.clear();
-        _focusNode.requestFocus();
-        _isProcessingBarcode = false;
-
         _hideOverlay();
         return;
       }
@@ -170,15 +203,15 @@ class _SearchBarState extends State<SearchBar> {
     }
   }
 
+  // _addProduct simply calls the callback.
   void _addProduct(Product product) {
-    if (!_isProcessingBarcode) {
-      widget.onAddProduct(product);
-    }
+    widget.onAddProduct(product);
+    _controller.clear();
+    _focusNode.requestFocus(); // Clear the search bar and request focus.
   }
 
   void _selectProduct(Product product) {
-    if (_isProcessingBarcode)
-      return; // Prevent selection during barcode processing
+    if (_isProcessingBarcode) return;
     _addProduct(product);
     _controller.clear();
     setState(() {
@@ -187,86 +220,154 @@ class _SearchBarState extends State<SearchBar> {
       _lastProcessedBarcode = null;
     });
     _hideOverlay();
-
-    // Request focus after a short delay
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
   }
 
-  void _handleKeyNavigation(KeyEvent event) {
-    if (_searchResults.isEmpty || _isProcessingBarcode) return;
+  void _moveSelectionUp() {
+    if (_searchResults.isEmpty) return;
+    setState(() {
+      _highlightedIndex = (_highlightedIndex - 1 + _searchResults.length) %
+          _searchResults.length;
+    });
+    // Key fix: Refresh the overlay to show the new highlighted index
+    _refreshOverlay();
+  }
 
-    if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-        setState(() {
-          _highlightedIndex = (_highlightedIndex + 1) % _searchResults.length;
-        });
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-        setState(() {
-          _highlightedIndex = (_highlightedIndex - 1 + _searchResults.length) %
-              _searchResults.length;
-        });
-      } else if (event.logicalKey == LogicalKeyboardKey.enter) {
-        if (_highlightedIndex >= 0 &&
-            _highlightedIndex < _searchResults.length) {
-          _selectProduct(_searchResults[_highlightedIndex]);
-        }
-      }
+  void _moveSelectionDown() {
+    if (_searchResults.isEmpty) return;
+    setState(() {
+      _highlightedIndex = (_highlightedIndex + 1) % _searchResults.length;
+    });
+    // Key fix: Refresh the overlay to show the new highlighted index
+    _refreshOverlay();
+  }
+
+  // New method to refresh the overlay when selection changes
+  void _refreshOverlay() {
+    if (_overlayEntry != null) {
+      _overlayEntry!.markNeedsBuild();
     }
+  }
+
+  void _selectHighlightedProduct() {
+    if (_searchResults.isEmpty ||
+        _highlightedIndex < 0 ||
+        _highlightedIndex >= _searchResults.length) return;
+    _selectProduct(_searchResults[_highlightedIndex]);
   }
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: FocusNode(),
-      onKeyEvent: _handleKeyNavigation,
-      child: CompositedTransformTarget(
-        link: _layerLink,
-        child: Container(
-          width: 611,
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.grey,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  onChanged: _handleSearch,
-                  decoration: InputDecoration(
-                    hintText: widget.hintText,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.arrowUp): _moveSelectionUp,
+        const SingleActivator(LogicalKeyboardKey.arrowDown): _moveSelectionDown,
+        const SingleActivator(LogicalKeyboardKey.enter):
+            _selectHighlightedProduct,
+        const SingleActivator(LogicalKeyboardKey.escape): _hideOverlay,
+      },
+      child: Focus(
+        autofocus: true,
+        child: CompositedTransformTarget(
+          link: _layerLink,
+          child: Container(
+            width: 611,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.grey,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                // Dropdown to select the search type.
+                Container(
+                  margin: const EdgeInsets.only(left: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white, width: 1),
                   ),
-                ),
-              ),
-              SizedBox(
-                width: 98,
-                height: 60,
-                child: ElevatedButton(
-                  onPressed: () => _handleSearch(_controller.text),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E0FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedSearchType,
+                      dropdownColor: Colors.white,
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _selectedSearchType = newValue!;
+                        });
+                        // After a dropdown selection, shift focus back to the search bar.
+                        _focusNode.requestFocus();
+                      },
+                      icon: const Icon(Icons.arrow_drop_down,
+                          color: Colors.black),
+                      items: <String>['Barcode', 'Name', 'ID']
+                          .map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: const TextStyle(color: Colors.black),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
-                  child: const Text(
-                    'Search',
-                    style: TextStyle(
-                      color: Color(0xFF313131),
-                      fontSize: 15,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w500,
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    onChanged: _handleSearch,
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
+                      border: InputBorder.none,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    onSubmitted: (value) {
+                      if (_searchResults.isNotEmpty && _highlightedIndex >= 0) {
+                        _selectProduct(_searchResults[_highlightedIndex]);
+                      } else {
+                        _handleSearch(value);
+                      }
+                    },
+                    // Key handlers for the TextField specifically
+                    onEditingComplete: () {
+                      if (_searchResults.isNotEmpty && _highlightedIndex >= 0) {
+                        _selectProduct(_searchResults[_highlightedIndex]);
+                      }
+                    },
+                    // Force focus to stay in the field when arrow keys are pressed
+                    textInputAction: TextInputAction.none,
+                  ),
+                ),
+                SizedBox(
+                  width: 98,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: () => _handleSearch(_controller.text),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00E0FF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Search',
+                      style: TextStyle(
+                        color: Color(0xFF313131),
+                        fontSize: 15,
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

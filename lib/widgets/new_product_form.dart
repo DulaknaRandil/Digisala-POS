@@ -13,6 +13,7 @@ import 'package:digisala_pos/widgets/product_add_save_button.dart';
 import 'package:excel/excel.dart' as ex;
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ProductForm extends StatefulWidget {
   final Function(Map<String, dynamic>)? onSave;
@@ -328,11 +329,19 @@ class _ProductFormState extends State<ProductForm> {
   /// ***************** New Function: Export Products to Excel *****************
   Future<void> _exportProductsToExcel() async {
     try {
+      // Step 1: Request Storage Permission
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        _showMessage('Storage permission denied', isError: true);
+        return;
+      }
+
+      // Step 2: Generate Excel File
       final products = await DatabaseHelper.instance.getAllProducts();
       var excel = ex.Excel.createExcel();
       ex.Sheet sheetObject = excel['Products'];
 
-      // Header row (export supplier name instead of supplierId)
+      // Header row
       List<ex.CellValue> header = [
         ex.TextCellValue('Barcode'),
         ex.TextCellValue('Name'),
@@ -347,7 +356,8 @@ class _ProductFormState extends State<ProductForm> {
         ex.TextCellValue('Supplier'),
       ];
       sheetObject.appendRow(header);
-      // Add mock data row
+
+      // Mock data row
       List<ex.CellValue> mockRow = [
         ex.TextCellValue('MOCK001'),
         ex.TextCellValue('Sample Product'),
@@ -363,15 +373,44 @@ class _ProductFormState extends State<ProductForm> {
       ];
       sheetObject.appendRow(mockRow);
 
-      final directory =
-          await getApplicationDocumentsDirectory(); // Using internal storage
-      final outputFile = File('${directory.path}/products_export.xlsx');
+      // Step 3: Let User Choose Directory
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      if (selectedDirectory == null) {
+        _showMessage('Export cancelled by user', isError: true);
+        return;
+      }
+
+      // Step 4: Save the File
+      final outputFile = File('$selectedDirectory/products_export.xlsx');
       await outputFile.writeAsBytes(excel.encode()!);
+
       _showMessage('Products exported to ${outputFile.path}', isError: false);
     } catch (e) {
       _showMessage('Error exporting products: ${e.toString()}', isError: true);
       print('Error exporting products: $e');
     }
+  }
+
+// ✅ Step 1: Request Storage Permission
+  Future<bool> _requestStoragePermission() async {
+    var status = await Permission.storage.status;
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
+    }
+    return status.isGranted;
+  }
+
+// ✅ Step 3: Alternative - Save in Scoped Storage (Android 10+)
+  Future<String> _getSavePath() async {
+    Directory? directory;
+
+    if (Platform.isAndroid) {
+      directory = await getExternalStorageDirectory(); // App-specific storage
+    } else {
+      directory = await getApplicationDocumentsDirectory();
+    }
+
+    return "${directory!.path}/products_export.xlsx";
   }
 
   Future<void> _handleSave() async {
