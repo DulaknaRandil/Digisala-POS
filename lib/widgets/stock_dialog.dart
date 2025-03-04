@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:digisala_pos/models/suppplier_model.dart';
+import 'package:digisala_pos/models/supplier_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/utils/pdf_service_stock.dart';

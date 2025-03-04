@@ -28,6 +28,8 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   final PrinterService _printerService = PrinterService();
   int _currentSalesPage = 1;
   final int _rowsPerPage = 10;
+  double _totalExpenses = 0.0;
+  List<Map<String, dynamic>> _dailyExpenses = [];
   @override
   void initState() {
     super.initState();
@@ -49,8 +51,9 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
   Future<void> _loadTodaySales() async {
     final today = DateTime.now();
     final sales = await DatabaseHelper.instance.getSalesByDate(today);
-
+    final expenses = await DatabaseHelper.instance.getExpensesByDate(today);
     double profit = 0.0;
+    double totalExpenses = 0.0;
 
     for (var sale in sales) {
       final items = await DatabaseHelper.instance.getSalesItems(sale.id!);
@@ -76,6 +79,15 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
     setState(() {
       _salesList = sales;
       _totalProfit = profit;
+      _totalExpenses =
+          expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+      _dailyExpenses = expenses
+          .map((e) => {
+                'category': e.category,
+                'description': e.description,
+                'amount': e.amount
+              })
+          .toList();
       _updateSalesSummary();
     });
   }
@@ -103,7 +115,9 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
 
     final pdf = pw.Document();
     final drawerDifference = endDrawerAmount - startDrawerAmount;
-    final isTallied = (drawerDifference - _totalAmount).abs() < 0.01;
+    // Update the drawer status calculation
+    final isTallied =
+        (drawerDifference - (_totalAmount - _totalExpenses)).abs() < 0.01;
     final drawerStatus = isTallied ? 'Tallied' : 'Not Tallied';
 
     // Load receipt setup data
@@ -187,7 +201,13 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
     });
 
     // Sort items by quantity (descending)
-    itemsList.sort((a, b) => b['quantity'].compareTo(a['quantity']));
+    // Sort items by quantity (descending), handling potential null values
+    itemsList.sort((a, b) {
+      // Use 0 as a default value if quantity is null
+      final quantityA = a['quantity'] ?? 0;
+      final quantityB = b['quantity'] ?? 0;
+      return quantityB.compareTo(quantityA);
+    });
 
     // Calculate items per page
     final salesItemsPerPage = 20;
@@ -485,9 +505,7 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                     ],
                   ),
                 ),
-
-                // Summary on last items page
-                if (pageNum == itemsTotalPages - 1)
+                if (pageNum == itemsTotalPages - 1 && _dailyExpenses.isEmpty)
                   pw.Container(
                     margin: const pw.EdgeInsets.only(top: 20),
                     padding: const pw.EdgeInsets.all(10),
@@ -506,10 +524,13 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                         pw.Text('Sales Count: $_salesCount'),
                         pw.Text(
                             'Total Profit: ${_totalProfit.toStringAsFixed(2)} LKR'),
+                        pw.Text('Total Sales Amount: $_totalAmount LKR'),
+                        pw.Text(
+                            'Daily Expenses: ${_totalExpenses.toStringAsFixed(2)} LKR'),
                         pw.Text(
                             'Start Day Drawer Amount: $startDrawerAmount LKR'),
-                        pw.Text('End Day Drawer Amount: $endDrawerAmount LKR'),
-                        pw.Text('Total Sales Amount: $_totalAmount LKR'),
+                        pw.Text(
+                            'End Day Drawer Amount: ${(_totalAmount - _totalExpenses + startDrawerAmount).toStringAsFixed(2)} LKR'),
                         pw.Text('Status: $drawerStatus',
                             style: pw.TextStyle(
                                 color:
@@ -518,7 +539,6 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                       ],
                     ),
                   ),
-
                 // Footer
                 pw.Container(
                   margin: const pw.EdgeInsets.only(top: 20),
@@ -554,7 +574,185 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
         ),
       );
     }
+    // Add this in the _generatePdfContent() function after the items summary section
 
+// Daily Expenses Section
+    final expensesPerPage = 20;
+    final expensesTotalPages = (_dailyExpenses.length / expensesPerPage).ceil();
+
+    for (var pageNum = 0; pageNum < expensesTotalPages; pageNum++) {
+      final startIndex = pageNum * expensesPerPage;
+      final endIndex = (startIndex + expensesPerPage < _dailyExpenses.length)
+          ? startIndex + expensesPerPage
+          : _dailyExpenses.length;
+
+      final pageExpenses = _dailyExpenses.sublist(startIndex, endIndex);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header Section
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    if (logoImage != null)
+                      pw.Container(
+                        width: 80,
+                        height: 80,
+                        child: pw.Image(logoImage),
+                      )
+                    else
+                      pw.Container(width: 80, height: 80),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(storeName,
+                            style: pw.TextStyle(
+                                fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Date: $date',
+                            style: pw.TextStyle(fontSize: 12)),
+                        pw.Text('Tel: $telephone',
+                            style: pw.TextStyle(fontSize: 12)),
+                        if (address.isNotEmpty)
+                          pw.Text('Address: $address',
+                              style: pw.TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text('Daily Expenses',
+                    style: pw.TextStyle(
+                        fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
+
+                // Expenses Table
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      pw.Table(
+                        border: pw.TableBorder.all(),
+                        columnWidths: {
+                          0: const pw.FlexColumnWidth(2),
+                          1: const pw.FlexColumnWidth(3),
+                          2: const pw.FlexColumnWidth(2),
+                        },
+                        children: [
+                          // Table header
+                          pw.TableRow(
+                            decoration:
+                                pw.BoxDecoration(color: PdfColors.grey300),
+                            children: ['Category', 'Description', 'Amount']
+                                .map((text) => pw.Padding(
+                                      padding: const pw.EdgeInsets.all(6),
+                                      child: pw.Text(text,
+                                          style: pw.TextStyle(
+                                              fontWeight: pw.FontWeight.bold)),
+                                    ))
+                                .toList(),
+                          ),
+                          // Data rows
+                          ...pageExpenses.map((expense) => pw.TableRow(
+                                children: [
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(expense['category']),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(expense['description']),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(4),
+                                    child: pw.Text(
+                                        expense['amount'].toStringAsFixed(2)),
+                                  ),
+                                ],
+                              )),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Summary on last expenses page
+                if (pageNum == expensesTotalPages - 1)
+                  pw.Container(
+                    margin: const pw.EdgeInsets.only(top: 20),
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(),
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(8)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('End of Day Summary',
+                            style: pw.TextStyle(
+                                fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                        pw.SizedBox(height: 10),
+                        pw.Text('Sales Count: $_salesCount'),
+                        pw.Text(
+                            'Total Profit: ${_totalProfit.toStringAsFixed(2)} LKR'),
+                        pw.Text('Total Sales Amount: $_totalAmount LKR'),
+                        pw.Text(
+                            'Daily Expenses: ${_totalExpenses.toStringAsFixed(2)} LKR'),
+                        pw.Text(
+                            'Start Day Drawer Amount: $startDrawerAmount LKR'),
+                        pw.Text(
+                            'End Day Drawer Amount: ${(_totalAmount - _totalExpenses + startDrawerAmount).toStringAsFixed(2)} LKR'),
+                        pw.Text('Status: $drawerStatus',
+                            style: pw.TextStyle(
+                                color:
+                                    isTallied ? PdfColors.green : PdfColors.red,
+                                fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+
+                // Footer
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(top: 20),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (digisalaLogoImage != null)
+                        pw.Container(
+                          height: 30,
+                          child: pw.Image(digisalaLogoImage),
+                        ),
+                      pw.Text(
+                        '© $currentYear Digisala POS. All rights reserved',
+                        style: pw.TextStyle(
+                            fontSize: 10, color: PdfColors.grey700),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Page number
+                pw.Container(
+                  alignment: pw.Alignment.centerRight,
+                  margin: const pw.EdgeInsets.only(top: 10),
+                  child: pw.Text(
+                    'Expenses Report - Page ${pageNum + 1} of $expensesTotalPages',
+                    style: pw.TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
     return pdf.save();
   }
 
@@ -921,6 +1119,12 @@ class _EndOfDayDialogState extends State<EndOfDayDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Total Profit: $_totalProfit LKR',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
+                  Text(
+                      'Daily Expenses: ${_totalExpenses.toStringAsFixed(2)} LKR',
                       style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

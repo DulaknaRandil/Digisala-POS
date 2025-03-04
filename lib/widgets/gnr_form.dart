@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/models/product_model.dart';
+import 'package:digisala_pos/utils/printer_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
@@ -18,7 +21,7 @@ class GRNForm extends StatefulWidget {
 class _GRNFormState extends State<GRNForm> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late TabController _tabController;
-
+  Map<int, String> _supplierDiscounts = {};
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   // Use a Map to associate each product ID with its TextEditingController.
@@ -150,63 +153,12 @@ class _GRNFormState extends State<GRNForm> with SingleTickerProviderStateMixin {
 
   Future<void> _generateAndDownloadPDF() async {
     try {
-      final pdf = pw.Document();
-
-      // Add title and date range info.
-      pdf.addPage(
-        pw.MultiPage(
-          build: (context) => [
-            pw.Header(
-              level: 0,
-              child: pw.Text('Stock Updates Report',
-                  style: pw.TextStyle(
-                      fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            ),
-            pw.SizedBox(height: 10),
-            pw.Text(
-                'Date Range: ${DateFormat('yyyy-MM-dd').format(_startDate)} - ${DateFormat('yyyy-MM-dd').format(_endDate)}'),
-            pw.SizedBox(height: 20),
-            pw.Table.fromTextArray(
-              headers: [
-                'Date/Time',
-                'ID',
-                'Name',
-                'Barcode',
-                'Supplier',
-                'Updated Stock',
-                'Discount',
-                'Total Discount', // New column
-                'Buying Price',
-                'Selling Price',
-                'Profit'
-              ],
-              data: _stockUpdates
-                  .map((update) => [
-                        update['updateDate'],
-                        update['productId'].toString(),
-                        update['productName'],
-                        update['barcode'],
-                        update['supplier'],
-                        update['quantityAdded'].toString(),
-                        update['discount'], // New data
-                        update['totalDiscount'].toStringAsFixed(2), // New data
-                        update['buyingPrice'].toString(),
-                        update['sellingPrice'].toString(),
-                        update['profit'].toStringAsFixed(2),
-                      ])
-                  .toList(),
-            ),
-          ],
-        ),
+      final bytes = await _generateStockUpdatesPdfContent();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename:
+            'stock_updates_${DateFormat('yyyyMMdd').format(_startDate)}-${DateFormat('yyyyMMdd').format(_endDate)}.pdf',
       );
-// in  to save to selected dictionary
-
-      final output = await getDownloadsDirectory();
-      final file = File(
-          '${output?.path}/stock_updates_${DateFormat('yyyyMMdd').format(_startDate)}-${DateFormat('yyyyMMdd').format(_endDate)}.pdf');
-      await file.writeAsBytes(await pdf.save());
-
-      _showSnackBar('PDF saved to ${file.path}', Colors.green);
     } catch (e) {
       print('Error generating PDF: $e');
       _showSnackBar('Error generating PDF', Colors.red);
@@ -215,62 +167,203 @@ class _GRNFormState extends State<GRNForm> with SingleTickerProviderStateMixin {
 
   Future<void> _printStockUpdates() async {
     try {
-      final pdf = pw.Document();
-
-      pdf.addPage(
-        pw.MultiPage(
-          build: (context) => [
-            pw.Header(
-              level: 0,
-              child: pw.Text('Stock Updates Report',
-                  style: pw.TextStyle(
-                      fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            ),
-            pw.SizedBox(height: 10),
-            pw.Text(
-                'Date Range: ${DateFormat('yyyy-MM-dd').format(_startDate)} - ${DateFormat('yyyy-MM-dd').format(_endDate)}'),
-            pw.SizedBox(height: 20),
-            pw.Table.fromTextArray(
-              headers: [
-                'Date/Time',
-                'ID',
-                'Name',
-                'Barcode',
-                'Supplier',
-                'Updated Stock',
-                'Discount',
-                'Total Discount', // New column
-                'Buying Price',
-                'Selling Price',
-                'Profit'
-              ],
-              data: _stockUpdates
-                  .map((update) => [
-                        update['updateDate'],
-                        update['productId'].toString(),
-                        update['productName'],
-                        update['barcode'],
-                        update['supplier'],
-                        update['quantityAdded'].toString(),
-                        update['discount'], // New data
-                        update['totalDiscount'].toStringAsFixed(2), // New data
-                        update['buyingPrice'].toString(),
-                        update['sellingPrice'].toString(),
-                        update['profit'].toStringAsFixed(2),
-                      ])
-                  .toList(),
-            ),
-          ],
-        ),
-      );
-
+      final bytes = await _generateStockUpdatesPdfContent();
       await Printing.layoutPdf(
-        onLayout: (format) async => pdf.save(),
+        onLayout: (format) async => bytes,
       );
     } catch (e) {
       print('Error printing: $e');
       _showSnackBar('Error printing report', Colors.red);
     }
+  }
+
+  Future<Uint8List> _generateStockUpdatesPdfContent() async {
+    final pdf = pw.Document();
+    final currentYear = DateTime.now().year;
+    final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Load receipt setup data
+    final receiptSetup = await PrinterService().loadReceiptSetup();
+    final storeName = receiptSetup['storeName'] ?? 'Store Name';
+    final telephone = receiptSetup['telephone'] ?? 'N/A';
+    final address = receiptSetup['address'] ?? '';
+    final logoPath = receiptSetup['logoPath'];
+
+    // Load store logo
+    pw.MemoryImage? logoImage;
+    if (logoPath != null && await File(logoPath).exists()) {
+      final logoBytes = await File(logoPath).readAsBytes();
+      logoImage = pw.MemoryImage(logoBytes);
+    }
+
+    // Header Section
+    pw.Widget buildHeader() {
+      return pw.Column(
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              if (logoImage != null)
+                pw.Container(
+                  width: 80,
+                  height: 80,
+                  child: pw.Image(logoImage),
+                )
+              else
+                pw.Container(width: 80, height: 80),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text(storeName,
+                      style: pw.TextStyle(
+                          fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Date: $date', style: pw.TextStyle(fontSize: 12)),
+                  pw.Text('Tel: $telephone', style: pw.TextStyle(fontSize: 12)),
+                  if (address.isNotEmpty)
+                    pw.Text('Address: $address',
+                        style: pw.TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 10),
+          pw.Divider(),
+        ],
+      );
+    }
+
+    // Footer Section
+    pw.Widget buildFooter() {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(top: 40),
+        child: pw.Column(
+          children: [
+            pw.Divider(),
+            pw.Text('© $currentYear Digisala POS. All rights reserved',
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+          ],
+        ),
+      );
+    }
+
+    // Item Table
+    pw.Widget buildItemTable(List<Map<String, dynamic>> items) {
+      return pw.Table(
+        border: pw.TableBorder.all(),
+        columnWidths: {
+          0: const pw.FlexColumnWidth(1.5),
+          1: const pw.FlexColumnWidth(3),
+          2: const pw.FlexColumnWidth(2),
+          3: const pw.FlexColumnWidth(1.5),
+          4: const pw.FlexColumnWidth(1.5),
+          5: const pw.FlexColumnWidth(1.5),
+          6: const pw.FlexColumnWidth(1.5),
+          7: const pw.FlexColumnWidth(1.5),
+        },
+        children: [
+          pw.TableRow(
+            decoration: pw.BoxDecoration(color: PdfColors.grey300),
+            children: [
+              'Date/Time',
+              'Name',
+              'Supplier',
+              'Barcode',
+              'Qty Added',
+              'Buy Price',
+              'Sell Price',
+              'Profit'
+            ]
+                .map((text) => pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(text,
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ))
+                .toList(),
+          ),
+          ...items
+              .map((item) => pw.TableRow(
+                    children: [
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(item['updateDate'])),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(item['productName'])),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(item['supplier']?.toString() ?? '')),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(item['barcode'])),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(item['quantityAdded'].toString())),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child:
+                              pw.Text(item['buyingPrice'].toStringAsFixed(2))),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child:
+                              pw.Text(item['sellingPrice'].toStringAsFixed(2))),
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(item['profit'].toStringAsFixed(2))),
+                    ],
+                  ))
+              .toList(),
+        ],
+      );
+    }
+
+    // Generate pages
+    const itemsPerPage = 10;
+    final totalPages = (_stockUpdates.length / itemsPerPage).ceil();
+
+    for (int page = 0; page < totalPages; page++) {
+      final start = page * itemsPerPage;
+      final end = (start + itemsPerPage < _stockUpdates.length)
+          ? start + itemsPerPage
+          : _stockUpdates.length;
+      final currentItems = _stockUpdates.sublist(start, end);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                buildHeader(),
+                pw.SizedBox(height: 10),
+                pw.Text('Stock Updates Report',
+                    style: pw.TextStyle(
+                        fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                    'Date Range: ${DateFormat('yyyy-MM-dd').format(_startDate)} - ${DateFormat('yyyy-MM-dd').format(_endDate)}',
+                    style: pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(height: 20),
+                buildItemTable(currentItems),
+                pw.Container(
+                  alignment: pw.Alignment.centerRight,
+                  margin: const pw.EdgeInsets.only(top: 10),
+                  child: pw.Text(
+                    'Page ${page + 1} of $totalPages',
+                    style: pw.TextStyle(fontSize: 12),
+                  ),
+                ),
+                if (page == totalPages - 1) buildFooter(),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    return pdf.save();
   }
 
   void _filterStockUpdates(String query) {
@@ -346,6 +439,474 @@ class _GRNFormState extends State<GRNForm> with SingleTickerProviderStateMixin {
     );
   }
 
+// Add these new methods to the _GRNFormState class
+  void _showDiscountDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: const Color.fromRGBO(2, 10, 27, 1),
+            title: Text(
+              "Enter Supplier Discounts",
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Container(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _stockUpdates.length,
+                itemBuilder: (context, index) {
+                  final item = _stockUpdates[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            item['productName'],
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            style: TextStyle(color: Colors.white),
+                            initialValue:
+                                _supplierDiscounts[item['productId']] ?? '',
+                            decoration: InputDecoration(
+                              labelText: 'Discount',
+                              labelStyle: TextStyle(color: Colors.white),
+                              hintText: 'e.g., 10% or 50',
+                              hintStyle: TextStyle(color: Colors.grey),
+                              fillColor: Colors.white,
+                              focusColor: Colors.white,
+                              hoverColor: Colors.green,
+                              helperStyle: TextStyle(color: Colors.white),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.white),
+                              ),
+                              floatingLabelStyle:
+                                  TextStyle(color: Colors.white),
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              _supplierDiscounts[item['productId']] = value;
+                            },
+                            validator: (value) {
+                              if (value?.isNotEmpty ?? false) {
+                                final cleanValue =
+                                    value!.replaceAll('%', '').trim();
+                                if (double.tryParse(cleanValue) == null) {
+                                  return 'Invalid value';
+                                }
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                style: ButtonStyle(
+                    backgroundColor: WidgetStateProperty.all(Colors.red)),
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              ElevatedButton(
+                style: ButtonStyle(
+                    backgroundColor: WidgetStateProperty.all(Colors.green)),
+                onPressed: () {
+                  if (_validateDiscounts()) {
+                    Navigator.pop(context);
+                    _generateGnrReport();
+                  }
+                },
+                child: Text('Generate Report',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  bool _validateDiscounts() {
+    for (var entry in _supplierDiscounts.entries) {
+      final value = entry.value;
+      if (value.isNotEmpty) {
+        final cleanValue = value.replaceAll('%', '').trim();
+        if (double.tryParse(cleanValue) == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content:
+                    Text('Invalid discount value for product ID ${entry.key}')),
+          );
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  Future<Uint8List> _generateGnrPdfContent() async {
+    final pdf = pw.Document();
+    final grnNumber =
+        'GRN-${DateFormat('yyyyMMdd').format(DateTime.now())}-${_stockUpdates.length}';
+    final preparedBy = 'Inventory Manager';
+    final currentYear = DateTime.now().year;
+    final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Load receipt setup data
+    final receiptSetup = await PrinterService().loadReceiptSetup();
+    final storeName = receiptSetup['storeName'] ?? 'Store Name';
+    final telephone = receiptSetup['telephone'] ?? 'N/A';
+    final address = receiptSetup['address'] ?? '';
+    final logoPath = receiptSetup['logoPath'];
+
+    // Load store logo
+    pw.MemoryImage? logoImage;
+    if (logoPath != null && await File(logoPath).exists()) {
+      final logoBytes = await File(logoPath).readAsBytes();
+      logoImage = pw.MemoryImage(logoBytes);
+    }
+
+    // Load Digisala logo
+    pw.MemoryImage? digisalaLogoImage;
+    final digisalaLogoPath = 'assets/logo.png';
+    if (await File(digisalaLogoPath).exists()) {
+      final logoBytes = await File(digisalaLogoPath).readAsBytes();
+      digisalaLogoImage = pw.MemoryImage(logoBytes);
+    }
+
+    // Header Section
+    pw.Widget buildHeader() {
+      return pw.Column(
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              if (logoImage != null)
+                pw.Container(
+                  width: 80,
+                  height: 80,
+                  child: pw.Image(logoImage),
+                )
+              else
+                pw.Container(width: 80, height: 80),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text(storeName,
+                      style: pw.TextStyle(
+                          fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Date: $date', style: pw.TextStyle(fontSize: 12)),
+                  pw.Text('Tel: $telephone', style: pw.TextStyle(fontSize: 12)),
+                  if (address.isNotEmpty)
+                    pw.Text('Address: $address',
+                        style: pw.TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 10),
+          pw.Divider(),
+        ],
+      );
+    }
+
+    // Supplier Information (only on first page)
+    pw.Widget buildSupplierInfo() {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(),
+          borderRadius: pw.BorderRadius.circular(5),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text('Supplier Details:',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Row(
+              children: [
+                pw.Text('GRN Number: ',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(grnNumber),
+                pw.Spacer(),
+                pw.Text('Date: ',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(DateFormat('dd-MMM-yyyy').format(DateTime.now())),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Item Table for a subset of items
+    pw.Widget buildItemTable(List<Map<String, dynamic>> items) {
+      return pw.Table(
+        border: pw.TableBorder.all(),
+        columnWidths: {
+          0: const pw.FlexColumnWidth(1),
+          1: const pw.FlexColumnWidth(3),
+          2: const pw.FlexColumnWidth(1.5),
+          3: const pw.FlexColumnWidth(1),
+          4: const pw.FlexColumnWidth(1.2), // Unit Price
+          5: const pw.FlexColumnWidth(1.3), // Discount
+          6: const pw.FlexColumnWidth(1.5), // Total
+        },
+        children: [
+          pw.TableRow(
+            decoration: pw.BoxDecoration(color: PdfColors.grey300),
+            children: [
+              'Item Code',
+              'Description',
+              'Supplier',
+              'Qty',
+              'Unit Price (LKR)',
+              'Discount', // New column
+              'Total (LKR)'
+            ]
+                .map((text) => pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(text,
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ))
+                .toList(),
+          ),
+          ...items.map((item) {
+            final discount = _supplierDiscounts[item['productId']] ?? '0%';
+            final (discountValue, isPercentage) = _parseDiscount(discount);
+            final buyingPrice = item['buyingPrice'] as double;
+            final quantity = item['quantityAdded'] as double;
+            final total = (buyingPrice * quantity) -
+                (isPercentage
+                    ? (buyingPrice * quantity * discountValue / 100)
+                    : discountValue);
+
+            return pw.TableRow(
+              children: [
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(item['productId'].toString())),
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(item['productName'])),
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(item['supplier']?.toString() ?? '')),
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(quantity.toStringAsFixed(2))),
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(buyingPrice.toStringAsFixed(2))),
+                // New Discount Cell
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(discount)), // Display entered discount
+                pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(total.toStringAsFixed(2))),
+              ],
+            );
+          }).toList(),
+        ],
+      );
+    }
+
+    // Totals Section
+    pw.Widget buildTotals() {
+      final grandTotal = _stockUpdates.fold(0.0, (sum, item) {
+        final discount = _supplierDiscounts[item['productId']] ?? '';
+        final (discountValue, isPercentage) = _parseDiscount(discount);
+        final buyingPrice = item['buyingPrice'] as double;
+        final quantity = item['quantityAdded'] as double;
+        return sum +
+            (buyingPrice * quantity) -
+            (isPercentage
+                ? (buyingPrice * quantity * discountValue / 100)
+                : discountValue);
+      });
+
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(top: 20),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Text('Grand Total: ',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text('LKR ${grandTotal.toStringAsFixed(2)}',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Authorization Section
+    pw.Widget buildAuthorization() {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(top: 40),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+          children: [
+            pw.Column(
+              children: [
+                pw.Text('Prepared By:'),
+                pw.SizedBox(height: 20),
+                pw.Text('_________________________'),
+                pw.Text(preparedBy),
+              ],
+            ),
+            pw.Column(
+              children: [
+                pw.Text('Authorized By:'),
+                pw.SizedBox(height: 20),
+                pw.Text('_________________________'),
+                pw.Text('Signature & Stamp'),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Footer Section
+    pw.Widget buildFooter() {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(top: 40),
+        child: pw.Column(
+          children: [
+            pw.Divider(),
+            pw.Text('Terms & Conditions:',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text('1. Goods received in good condition'),
+            pw.Text('2. Shortages must be reported within 48 hours'),
+            pw.Text('3. Prices subject to verification'),
+            pw.SizedBox(height: 20),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                if (digisalaLogoImage != null)
+                  pw.Container(
+                    height: 30,
+                    child: pw.Image(digisalaLogoImage),
+                  ),
+                pw.Text(
+                  '© $currentYear Digisala POS. All rights reserved',
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Generate Item Pages
+    const itemsPerPage = 10;
+    final totalPages = (_stockUpdates.length / itemsPerPage).ceil();
+
+    for (int page = 0; page < totalPages; page++) {
+      final start = page * itemsPerPage;
+      final end = (start + itemsPerPage < _stockUpdates.length)
+          ? start + itemsPerPage
+          : _stockUpdates.length;
+      final currentItems = _stockUpdates.sublist(start, end);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                buildHeader(),
+                if (page == 0) ...[
+                  buildSupplierInfo(),
+                  pw.SizedBox(height: 20),
+                ],
+                buildItemTable(currentItems),
+                pw.Container(
+                  alignment: pw.Alignment.centerRight,
+                  margin: const pw.EdgeInsets.only(top: 10),
+                  child: pw.Text(
+                    'Page ${page + 1} of ${totalPages + 1}',
+                    style: pw.TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // Final Page with Totals, Authorization, and Footer
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              buildHeader(),
+              buildTotals(),
+              buildAuthorization(),
+              buildFooter(),
+              pw.Container(
+                alignment: pw.Alignment.centerRight,
+                margin: const pw.EdgeInsets.only(top: 10),
+                child: pw.Text(
+                  'Page ${totalPages + 1} of ${totalPages + 1}',
+                  style: pw.TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<void> _generateGnrReport() async {
+    try {
+      final bytes = await _generateGnrPdfContent();
+      final dateStamp = DateFormat('yyyyMMdd').format(DateTime.now());
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'gnr_report_$dateStamp.pdf',
+      );
+    } catch (e) {
+      print('Error generating GNR report: $e');
+      _showSnackBar('Error generating GNR report', Colors.red);
+    }
+  }
+
   Widget _buildStockUpdateTab() {
     return Column(
       children: [
@@ -399,73 +960,76 @@ class _GRNFormState extends State<GRNForm> with SingleTickerProviderStateMixin {
           child: _isLoading
               ? Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    // In _buildStockUpdateTab():
-                    columns: const [
-                      DataColumn(
-                          label: Text('Date/Time',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('ID',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Name',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Barcode',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Supplier',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Qty Added',
-                              style: TextStyle(color: Colors.white))),
-                      // New
-                      DataColumn(
-                          label: Text('Buy Price',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Sell Price',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Discount',
-                              style: TextStyle(color: Colors.white))), // New
-                      DataColumn(
-                          label: Text('Total Disc.',
-                              style: TextStyle(color: Colors.white))),
-                      DataColumn(
-                          label: Text('Profit',
-                              style: TextStyle(color: Colors.white))),
-                    ],
-                    rows: _stockUpdates.map((update) {
-                      return DataRow(
-                        cells: [
-                          DataCell(Text(update['updateDate'],
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['productId'].toString(),
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['productName'],
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['barcode'],
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['supplier'],
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['quantityAdded'].toString(),
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['buyingPrice'].toString(),
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['sellingPrice'].toString(),
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['discount'].toString(),
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['totalDiscount'].toString(),
-                              style: TextStyle(color: Colors.white))),
-                          DataCell(Text(update['profit'].toStringAsFixed(2),
-                              style: TextStyle(color: Colors.white))),
-                        ],
-                      );
-                    }).toList(),
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      // In _buildStockUpdateTab():
+                      columns: const [
+                        DataColumn(
+                            label: Text('Date/Time',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('ID',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Name',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Barcode',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Supplier',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Qty Added',
+                                style: TextStyle(color: Colors.white))),
+                        // New
+                        DataColumn(
+                            label: Text('Buy Price',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Sell Price',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Discount',
+                                style: TextStyle(color: Colors.white))), // New
+                        DataColumn(
+                            label: Text('Total Disc.',
+                                style: TextStyle(color: Colors.white))),
+                        DataColumn(
+                            label: Text('Profit',
+                                style: TextStyle(color: Colors.white))),
+                      ],
+                      rows: _stockUpdates.map((update) {
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(update['updateDate'],
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['productId'].toString(),
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['productName'],
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['barcode'],
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['supplier'],
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['quantityAdded'].toString(),
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['buyingPrice'].toString(),
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['sellingPrice'].toString(),
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['discount'].toString(),
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['totalDiscount'].toString(),
+                                style: TextStyle(color: Colors.white))),
+                            DataCell(Text(update['profit'].toStringAsFixed(2),
+                                style: TextStyle(color: Colors.white))),
+                          ],
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
         ),
@@ -476,6 +1040,11 @@ class _GRNFormState extends State<GRNForm> with SingleTickerProviderStateMixin {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              IconButton(
+                icon: Icon(Icons.assignment, color: Colors.white),
+                onPressed: _showDiscountDialog,
+                tooltip: 'Generate GNR Report',
+              ),
               IconButton(
                 icon: Icon(Icons.print, color: Colors.white),
                 onPressed: _printStockUpdates,

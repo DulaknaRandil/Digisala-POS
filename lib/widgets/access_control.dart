@@ -155,298 +155,303 @@ class _UserAccessControlDialogState extends State<UserAccessControlDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: Color.fromRGBO(2, 10, 27, 1),
-      title: Text(
-        'User Access Control',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-      content: Container(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // New user form
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Color.fromRGBO(10, 20, 40, 1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Add New User',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 12),
-                  TextField(
-                    controller: _usernameController,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.blue),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Color.fromRGBO(5, 15, 35, 1),
-                    ),
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  SizedBox(height: 12),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.blue),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Color.fromRGBO(5, 15, 35, 1),
-                    ),
-                    obscureText: true,
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: _roleController.text,
-                    items: _roles
-                        .map((role) => DropdownMenuItem(
-                              value: role,
-                              child: Text(role),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _roleController.text = value ?? _roles.first;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Role',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.blue),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Color.fromRGBO(5, 15, 35, 1),
-                    ),
-                    dropdownColor: Color.fromRGBO(2, 10, 27, 1),
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    icon: Icon(Icons.person_add),
-                    label:
-                        Text('Add User', style: TextStyle(color: Colors.white)),
-                    onPressed: _addUser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey.withAlpha(200),
-                      shadowColor: Colors.blue,
-                      iconColor: Colors.white,
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 20),
-
-            // User list
-            Expanded(
-              child: Container(
+    return SingleChildScrollView(
+      child: AlertDialog(
+        backgroundColor: Color.fromRGBO(2, 10, 27, 1),
+        title: Text(
+          'User Access Control',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // New user form
+              Container(
+                padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Color.fromRGBO(10, 20, 40, 1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: SingleChildScrollView(
-                  child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(
-                      Color.fromRGBO(20, 30, 50, 1),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add New User',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
                     ),
-                    columnSpacing: 16,
-                    columns: [
-                      DataColumn(
-                        label: Text('Username',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                    SizedBox(height: 12),
+                    TextField(
+                      controller: _usernameController,
+                      decoration: InputDecoration(
+                        labelText: 'Username',
+                        labelStyle: TextStyle(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.blue),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Color.fromRGBO(5, 15, 35, 1),
                       ),
-                      DataColumn(
-                        label: Text('Password',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 12),
+                    TextField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: TextStyle(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.blue),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Color.fromRGBO(5, 15, 35, 1),
                       ),
-                      DataColumn(
-                        label: Text('Role',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                      obscureText: true,
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _roleController.text,
+                      items: _roles
+                          .map((role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(role),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _roleController.text = value ?? _roles.first;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Role',
+                        labelStyle: TextStyle(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.blue),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Color.fromRGBO(5, 15, 35, 1),
                       ),
-                      DataColumn(
-                        label: Text('Actions',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                      dropdownColor: Color.fromRGBO(2, 10, 27, 1),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      icon: Icon(Icons.person_add),
+                      label: Text('Add User',
+                          style: TextStyle(color: Colors.white)),
+                      onPressed: _addUser,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueGrey.withAlpha(200),
+                        shadowColor: Colors.blue,
+                        iconColor: Colors.white,
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ],
-                    rows: List.generate(_users.length, (index) {
-                      final user = _users[index];
-                      final isFirstRecord = index == 0;
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 20),
 
-                      return DataRow(cells: [
-                        DataCell(
-                          isFirstRecord
-                              ? Text(
-                                  user.username,
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                )
-                              : TextField(
-                                  controller: TextEditingController(
-                                      text: user.username),
-                                  style: TextStyle(color: Colors.white),
-                                  onSubmitted: (value) {
-                                    if (value.isEmpty) {
-                                      _showSnackBar('Username cannot be empty');
-                                      return;
-                                    }
-                                    user.username = value;
-                                    _updateUser(user);
-                                  },
-                                  decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                  ),
-                                ),
+              // User list
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Color.fromRGBO(10, 20, 40, 1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SingleChildScrollView(
+                    child: DataTable(
+                      headingRowColor: MaterialStateProperty.all(
+                        Color.fromRGBO(20, 30, 50, 1),
+                      ),
+                      columnSpacing: 16,
+                      columns: [
+                        DataColumn(
+                          label: Text('Username',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ),
-                        DataCell(
-                          isFirstRecord
-                              ? Text(
-                                  '********',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                )
-                              : TextField(
-                                  controller: TextEditingController(
-                                      text: user.password),
-                                  style: TextStyle(color: Colors.white),
-                                  onSubmitted: (value) {
-                                    if (value.isEmpty) {
-                                      _showSnackBar('Password cannot be empty');
-                                      return;
-                                    }
-                                    user.password = value;
-                                    _updateUser(user);
-                                  },
-                                  decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                  ),
-                                ),
+                        DataColumn(
+                          label: Text('Password',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ),
-                        DataCell(
-                          isFirstRecord
-                              ? Text(
-                                  user.role,
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                )
-                              : DropdownButton<String>(
-                                  value: _roles.contains(user.role)
-                                      ? user.role
-                                      : _roles.first,
-                                  items: _roles
-                                      .map((role) => DropdownMenuItem(
-                                            value: role,
-                                            child: Text(role),
-                                          ))
-                                      .toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      user.role = value ?? user.role;
-                                      _updateUser(user);
-                                    });
-                                  },
-                                  dropdownColor: Color.fromRGBO(2, 10, 27, 1),
-                                  style: TextStyle(color: Colors.white),
-                                  underline: Container(height: 0),
-                                ),
+                        DataColumn(
+                          label: Text('Role',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ),
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!isFirstRecord) ...[
-                                IconButton(
-                                  icon: Icon(Icons.save, color: Colors.green),
-                                  onPressed: () => _updateUser(user),
-                                  tooltip: 'Save',
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _deleteUser(user),
-                                  tooltip: 'Delete',
-                                ),
-                              ] else
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16),
-                                  child: Text(
-                                    'Protected',
+                        DataColumn(
+                          label: Text('Actions',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                      rows: List.generate(_users.length, (index) {
+                        final user = _users[index];
+                        final isFirstRecord = index == 0;
+
+                        return DataRow(cells: [
+                          DataCell(
+                            isFirstRecord
+                                ? Text(
+                                    user.username,
                                     style: TextStyle(
-                                      color: Colors.amber,
-                                      fontStyle: FontStyle.italic,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold),
+                                  )
+                                : TextField(
+                                    controller: TextEditingController(
+                                        text: user.username),
+                                    style: TextStyle(color: Colors.white),
+                                    onSubmitted: (value) {
+                                      if (value.isEmpty) {
+                                        _showSnackBar(
+                                            'Username cannot be empty');
+                                        return;
+                                      }
+                                      user.username = value;
+                                      _updateUser(user);
+                                    },
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
                                     ),
                                   ),
-                                ),
-                            ],
                           ),
-                        ),
-                      ]);
-                    }),
+                          DataCell(
+                            isFirstRecord
+                                ? Text(
+                                    '********',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold),
+                                  )
+                                : TextField(
+                                    controller: TextEditingController(
+                                        text: user.password),
+                                    style: TextStyle(color: Colors.white),
+                                    onSubmitted: (value) {
+                                      if (value.isEmpty) {
+                                        _showSnackBar(
+                                            'Password cannot be empty');
+                                        return;
+                                      }
+                                      user.password = value;
+                                      _updateUser(user);
+                                    },
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
+                                    ),
+                                  ),
+                          ),
+                          DataCell(
+                            isFirstRecord
+                                ? Text(
+                                    user.role,
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold),
+                                  )
+                                : DropdownButton<String>(
+                                    value: _roles.contains(user.role)
+                                        ? user.role
+                                        : _roles.first,
+                                    items: _roles
+                                        .map((role) => DropdownMenuItem(
+                                              value: role,
+                                              child: Text(role),
+                                            ))
+                                        .toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        user.role = value ?? user.role;
+                                        _updateUser(user);
+                                      });
+                                    },
+                                    dropdownColor: Color.fromRGBO(2, 10, 27, 1),
+                                    style: TextStyle(color: Colors.white),
+                                    underline: Container(height: 0),
+                                  ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!isFirstRecord) ...[
+                                  IconButton(
+                                    icon: Icon(Icons.save, color: Colors.green),
+                                    onPressed: () => _updateUser(user),
+                                    tooltip: 'Save',
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _deleteUser(user),
+                                    tooltip: 'Delete',
+                                  ),
+                                ] else
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 16),
+                                    child: Text(
+                                      'Protected',
+                                      style: TextStyle(
+                                        color: Colors.amber,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ]);
+                      }),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            widget.searchBarFocusNode.requestFocus();
-          },
-          child: Text('Close', style: TextStyle(color: Colors.white)),
-          style: TextButton.styleFrom(
-            backgroundColor: Colors.blueGrey.withAlpha(200),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ],
           ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              widget.searchBarFocusNode.requestFocus();
+            },
+            child: Text('Close', style: TextStyle(color: Colors.white)),
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.blueGrey.withAlpha(200),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

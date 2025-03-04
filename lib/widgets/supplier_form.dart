@@ -1,5 +1,5 @@
 import 'package:digisala_pos/database/product_db_helper.dart';
-import 'package:digisala_pos/models/suppplier_model.dart';
+import 'package:digisala_pos/models/supplier_model.dart';
 import 'package:flutter/material.dart';
 
 class SupplierForm extends StatefulWidget {

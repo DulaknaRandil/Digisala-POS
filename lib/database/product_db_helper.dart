@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'package:digisala_pos/models/delete_sale_item_model.dart';
 import 'package:digisala_pos/models/delete_sale_model.dart';
+import 'package:digisala_pos/models/expense_model.dart';
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/pos_id_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
 import 'package:digisala_pos/models/salesItem_model.dart';
 import 'package:digisala_pos/models/sales_model.dart';
 import 'package:digisala_pos/models/return_model.dart';
-import 'package:digisala_pos/models/suppplier_model.dart';
+import 'package:digisala_pos/models/supplier_model.dart';
 import 'package:digisala_pos/models/user_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
@@ -172,6 +173,80 @@ class DatabaseHelper {
         FOREIGN KEY (deleteSaleId) REFERENCES delete_sales (id)
       )
     ''');
+    // In _createDB method of DatabaseHelper
+    await db.execute('''
+  CREATE TABLE expenses(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount REAL NOT NULL
+  )
+''');
+  }
+
+// In DatabaseHelper class
+  Future<int> insertExpense(Expense expense) async {
+    final db = await instance.database;
+    return await db.insert('expenses', expense.toMap());
+  }
+
+  Future<List<Expense>> getAllExpenses() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('expenses');
+    return List.generate(maps.length, (i) => Expense.fromMap(maps[i]));
+  }
+
+  Future<List<Expense>> getExpensesByDateRange(
+      DateTime start, DateTime end) async {
+    final db = await instance.database;
+    final String startIso = start.toIso8601String();
+    final String endIso = end.add(Duration(days: 1)).toIso8601String();
+
+    return await db.query(
+      'expenses',
+      where: 'date BETWEEN ? AND ?',
+      whereArgs: [startIso, endIso],
+    ).then(
+        (maps) => List.generate(maps.length, (i) => Expense.fromMap(maps[i])));
+  }
+
+  Future<List<Expense>> getExpensesByDate(DateTime date) async {
+    final db = await instance.database;
+    final String formattedDate = date.toIso8601String().split('T').first;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'expenses',
+      where: 'date LIKE ?',
+      whereArgs: ['$formattedDate%'],
+    );
+
+    return List.generate(maps.length, (i) => Expense.fromMap(maps[i]));
+  }
+
+  Future<List<Expense>> searchExpenses(String query) async {
+    final db = await instance.database;
+    return await db.rawQuery('''
+    SELECT * FROM expenses 
+    WHERE category LIKE ? 
+       OR description LIKE ? 
+       OR id LIKE ?
+  ''', [
+      '%$query%',
+      '%$query%',
+      '%$query%'
+    ]).then(
+        (maps) => List.generate(maps.length, (i) => Expense.fromMap(maps[i])));
+  }
+
+  Future<int> deleteExpense(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> insertSupplier(Supplier supplier) async {

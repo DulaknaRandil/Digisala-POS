@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:digisala_pos/utils/printer_service.dart';
 import 'package:digisala_pos/utils/receipt_pdf.dart';
 import 'package:digisala_pos/widgets/access_control.dart';
+import 'package:digisala_pos/widgets/expense_dialog.dart';
 import 'package:digisala_pos/widgets/gnr_form.dart';
 import 'package:digisala_pos/widgets/printerSelectionDialog.dart';
 import 'package:digisala_pos/widgets/receipt_setup.dart';
@@ -647,6 +648,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showExpensesDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ExpensesDialog(searchBarFocusNode: FocusNode()),
+    );
+  }
+
   void _handleClose() {
     setState(() {
       _checkoutList.clear();
@@ -722,6 +730,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       case 'Item Return':
                         _showSalesHistory();
                         break;
+                      case 'Expenses':
+                        _showExpensesDialog();
+                        break;
                     }
                   },
                   itemBuilder: (BuildContext context) =>
@@ -734,6 +745,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     const PopupMenuItem<String>(
                       value: 'Item Return',
                       child: Text('Item Return',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'Expenses',
+                      child: Text('Expenses',
                           style: TextStyle(color: Colors.white)),
                     ),
                   ],

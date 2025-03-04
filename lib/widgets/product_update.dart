@@ -1,7 +1,7 @@
 import 'package:digisala_pos/database/product_db_helper.dart';
 import 'package:digisala_pos/models/group_model.dart';
 import 'package:digisala_pos/models/product_model.dart';
-import 'package:digisala_pos/models/suppplier_model.dart';
+import 'package:digisala_pos/models/supplier_model.dart';
 import 'package:digisala_pos/widgets/admin_confirmation_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';

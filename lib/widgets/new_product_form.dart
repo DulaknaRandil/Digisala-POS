@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:digisala_pos/models/suppplier_model.dart';
+import 'package:digisala_pos/models/supplier_model.dart';
 import 'package:digisala_pos/widgets/product_add%20header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
